@@ -1,5 +1,7 @@
 import json
 
+import sys
+
 from flask import Flask, request, render_template
 from flask import jsonify
 
@@ -188,6 +190,7 @@ def poll():
 #  sudo python3 flask-backend.py
 # verified this way on development machine. Will verify on production machine
 # sudo flask --app src/flask-backend/flask-backend.py run --host 0.0.0.0 --port 80 --no-debugger
-if(__name__ == '__main__'):
-    app.run(host='localhost', port=80, threaded=True)
+if __name__ == '__main__':
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 80
+    app.run(host='localhost', port=port, threaded=True)
 
