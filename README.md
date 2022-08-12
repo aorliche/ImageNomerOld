@@ -90,10 +90,10 @@ python getdata.py
 Once you have loaded the data, navigate back to the top ImageNomeR directory, and start the server:
 
 ```
-sudo python src/flask_backend/flask_backend.py
+ython src/flask_backend/flask_backend.py 8000
 ```
 
-Navigate to http://localhost/ (note, no "s"). If the server is running but there are no analyses, you will see a screen like the following:
+Navigate to http://localhost:8000/ (note, no "s"). If the server is running but there are no analyses, you will see a screen like the following:
 
 <img src='https://github.com/u-brite/ImageNomeR/blob/main/results/EmptyFrontPage.png?raw=1' width='400px'><br/>
 
