@@ -1,0 +1,6 @@
+*.json
+fmri-ts-rest/*
+fmri-ts-epr/*
+omics/*
+*.pkl
+*.txt

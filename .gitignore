@@ -1,0 +1,5 @@
+notebooks/*/*.ipynb_checkpoints
+__pycache__
+*/__pycache__
+src/React_App
+results
