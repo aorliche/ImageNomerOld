@@ -12,8 +12,8 @@ import time
 
 app = Flask(__name__, 
 	static_url_path='',
-	static_folder='/home/anton/Documents/Tulane/Hackathon/ImageNomeR/static',
-	template_folder='/home/anton/Documents/Tulane/Hackathon/ImageNomeR/templates')
+	static_folder=os.path.abspath('static'),
+	template_folder=os.path.abspath('templates'))
 
 cache = {}
 

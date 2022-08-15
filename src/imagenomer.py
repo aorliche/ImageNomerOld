@@ -166,7 +166,9 @@ class Analysis:
     .postData() .postMetadata() and .postSubjects() are called by the .post()
     methods of JsonBase-derived classes
     '''
-    def __init__(self, desc='test', host='localhost', port=80):
+    instances = []
+
+    def __init__(self, desc='test analysis', host='localhost', port=80, kill_others=True):
         self.id = uuid.uuid4()
         self.desc = desc
         self.host = host
@@ -175,7 +177,31 @@ class Analysis:
         self.subjects = None
         self.port = port
         self.headers = {"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        self.pollForClientImageRequest()
+        self.fail = 0
+        self.t = None
+        self.lock = threading.Lock()
+        Analysis.instances.append(self)
+        self.poll()
+        if kill_others:
+            self.kill_others()
+    
+    @staticmethod
+    def kill_analysis(an):
+        got = an.lock.acquire(timeout=1)
+        if an.t is not None:
+            an.t.cancel()
+            an.t = None
+        if got:
+            an.lock.release()
+
+    def kill_others(self):
+        for an in Analysis.instances:
+            if an == self:
+                continue
+            Analysis.kill_analysis(an)
+
+    def kill_self(self):
+        Analysis.kill_analysis(self)
     
     def postData(self, data):
         url = f'http://{self.host}:{self.port}/post?id={self.id}&runid={self.runid}&type=data'
@@ -202,17 +228,28 @@ class Analysis:
         r = requests.post(url, headers=self.headers, data=image)
         return r
     
-    def pollForClientImageRequest(self):
+    def poll(self):
         '''
         Client asks server to draw a glass brain image
         '''
-        t = threading.Timer(2, self.pollForClientImageRequest)
-        t.daemon = True
-        t.start()
+        if self.fail > 4:
+            return
+        got = self.lock.acquire(timeout=1)
+        self.t = threading.Timer(2, self.poll)
+        self.t.daemon = True
+        self.t.start()
+        if got:
+            self.lock.release()
         url = f'http://{self.host}:{self.port}/poll?id={self.id}'
-        r = requests.get(url, headers=self.headers)
-        if r.status_code == 200:
-            clientReq = r.json()
-            if 'regions' in clientReq or 'connections' in clientReq:
-                JsonImage(self, clientReq).post()
+        try:
+            r = requests.get(url, headers=self.headers)
+            if r.status_code == 200:
+                clientReq = r.json()
+                if 'regions' in clientReq or 'connections' in clientReq:
+                    JsonImage(self, clientReq).post()
+                self.fail = 0
+            else:
+                self.fail += 1
+        except:
+            self.fail += 1
 

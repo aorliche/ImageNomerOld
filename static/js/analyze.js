@@ -28,6 +28,8 @@ window.addEventListener('load', e => {
     const plotRegionsButton = document.querySelector('#plotRegionsButton');
     const plotConnectionsButton = document.querySelector('#plotConnectionsButton');
     const plotDiv = document.querySelector('#plotDiv');
+    const exportLabelsA = document.querySelector('#export-labels');
+    const loadMetadataA = document.querySelector('#load-metadata');
 
 	barGraph = new BarGraph({
 		dim: {w: canvas.width, h: canvas.height}
@@ -71,10 +73,14 @@ window.addEventListener('load', e => {
 	});
 
 	// Get BFN metadata
-	fetch(`/data?id=${id}&metadata`)
-	.then(resp => resp.json())
-	.then(json => metadataLoadCb(json))
-	.catch(err => console.log(err));
+    function loadMetadata() {
+        fetch(`/data?id=${id}&metadata`)
+        .then(resp => resp.json())
+        .then(json => metadataLoadCb(json))
+        .catch(err => console.log(err));
+    }
+
+    loadMetadata();
 
 	canvas.addEventListener('mousemove', e => {
 		const graph = barBoxButton.innerText == 'Box Plot' ? barGraph : boxPlot;
@@ -211,4 +217,38 @@ window.addEventListener('load', e => {
     
 	plotRegionsButton.addEventListener('click', e => consOrRegsRequest('regions'));
 	plotConnectionsButton.addEventListener('click', e => consOrRegsRequest('connections'));
+
+    function exportLabels() {
+        const text = [];
+        if (barBoxButton.innerText == 'Box Plot') {
+            barGraph.bars.forEach(bar => {
+                text.push(bar.label);
+            });
+        } else {
+            boxPlot.boxes.forEach(box => {
+                text.push(box.label);
+            });
+        }
+        const file = new Blob([text.join('\n')], {type: "application/octet-stream"});
+        const a = document.createElement("a");
+        const url = URL.createObjectURL(file);
+        a.href = url;
+        a.download = "labels.txt";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 0);
+    }
+    
+    exportLabelsA.addEventListener('click', e => {
+        e.preventDefault();
+        exportLabels();
+    });
+
+    loadMetadataA.addEventListener('click', e => {
+        e.preventDefault();
+        loadMetadata();
+    });
 });
