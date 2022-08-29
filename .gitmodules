@@ -1,0 +1,3 @@
+[submodule "LatentSimilarity"]
+	path = LatentSimilarity
+	url = https://github.com/aorliche/LatentSimilarity

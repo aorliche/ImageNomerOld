@@ -2,17 +2,60 @@ function zip(a, b) {
 	return a.map((e,i) => [e, b[i]]);
 }
 
-function strokeLine(ctx, p0, p1, color) {
+function range(end) {
+    return [...Array(end).keys()];
+}
+
+// Label index of bar graph in form 'xxx-xxx'
+// The labeled (Labels, LabelNames) run is always at position 0, all other runs are unlabeled
+function getRoiRoiLabelsIdx(graph) {
+    let labelsIdx = null;
+    graph.runs[0].Labels.forEach((labels, i) => {
+        if (labels[0].toString().search(/\d+-\d+/) != -1) {
+            labelsIdx = i;
+        }
+    });
+    return labelsIdx;
+}
+
+/*function strokeLine(ctx, p0, p1, color) {
 	ctx.strokeStyle = color ?? '#000';
 	ctx.beginPath();
 	ctx.moveTo(p0.x, p0.y);
 	ctx.lineTo(p1.x, p1.y);
 	ctx.stroke();
+}*/
+
+class VegaBarAdapter {
+    constructor(div) {
+        this.div = div;
+        this.view = null;
+    }
+
+    render(spec) {
+        this.view = new vega.View(vega.parse(spec), {
+            renderer: 'canvas',
+            container: `#${this.div.id}`,
+            hover: true
+        });
+        return this.view.runAsync();
+    }
+
+    repaintEmpty(msg) {
+        // Clear graph
+        this.div.innerHTML = '';
+        this.div.innerText = msg;
+        // Remove listeners
+        const div = this.div.cloneNode(true);
+        this.div.parentNode.replaceChild(div, this.div);
+        this.div = div;
+        this.div.classList.add('empty');
+    }
 }
 
-class Bar {
+/*class Bar extends VegaBarAdapter {
 	constructor(params) {
-		this.label = params.label;
+		this.idx = params.idx;
 		this.graph = params.graph;
 		this.pos = params.pos;
 		this.dim = params.dim;
@@ -34,9 +77,12 @@ class Bar {
 			const y = (n%2 == 0) ? this.pos.y-12 : this.pos.y+this.dim.h+12;
 			ctx.fillStyle = '#000';
 			ctx.font = 'normal 8px Sans-serif';
-			const label = this.graph.displayMeta.checked && this.graph.meta ? this.metaLabel : this.label;
-			const labelWidth = ctx.measureText(label).width;
-			ctx.fillText(label, this.pos.x-labelWidth/2+this.dim.w/2, y);
+			//const label = this.graph.displayMeta.checked && this.graph.meta ? this.metaLabel : this.label;
+            if (this.graph.labelsIdx || this.graph.labelsIdx === 0) {
+                const label = this.graph.runs[0].Labels[this.graph.labelsIdx][this.idx];
+                const labelWidth = ctx.measureText(label).width;
+                ctx.fillText(label, this.pos.x-labelWidth/2+this.dim.w/2, y);
+            }
 		}
 	}
 
@@ -98,154 +144,317 @@ class Box {
 		b = this.graph.meta.CommunityNames[this.graph.meta.CommunityMap[parseInt(b)]];
 		return `${a}-${b}`;
 	}
+}*/
+
+class ConnectionsBarGraph extends VegaBarAdapter {
+    constructor(bar, div) {
+        super(div);
+        this.bar = bar; // main bar graph
+    }
+
+    repaint() {
+        // We've loaded data
+        if (this.bar.runs.length == 0) {
+            this.repaintEmpty('No runs loaded');
+            return;
+        }
+        this.bins = [];
+        // Check that bar contains connections (labels) of the form 'xxx-xxx'
+        const labelsIdx = getRoiRoiLabelsIdx(this.bar);
+        if (!labelsIdx && labelsIdx !== 0) {
+            this.repaintEmpty('No labels matching "xxx-xxx" in run 0');
+            return;
+        }
+        // Bin connections in range From - To (set via listener in analyze.js)
+        for (let i=this.from; i<this.to; i++) {
+            this.bar.runs[0].Labels[labelsIdx][this.bar.composite[i][1]].split('-').forEach(roi => {
+                const prev = this.bins[roi] ?? 0;
+                this.bins[roi] = prev+1;
+            });
+        }
+        // Fill in empty slots
+        for (let i=0; i<this.bins.length; i++) {
+            if (!this.bins[i]) this.bins[i] = 0;
+        }
+        // Get top 6 rois
+        const sortedBins = this.bins.map((n, roi) => [n, roi]);
+        sortedBins.sort((a,b) => b[0]-a[0]);
+        const top6 = sortedBins.slice(0,6).map(a => a[1]);
+        // Construct Vega spec
+        const style = getComputedStyle(this.div);
+        const values = this.bins.map((n, roi) => ({"roi": roi.toString(), "top6roi": top6.includes(roi) ? roi.toString() : "", "number": n}));
+        const spec = {
+            "$schema": "https://vega.github.io/schema/vega/v5.json",
+            "width": parseInt(style.width)-60,
+            "height": parseInt(style.height)-60,
+            "padding": 0,
+            "data": [
+            {
+                "name": "bins",
+                "values": values
+            }],
+            "signals": [
+            {
+                "name": "tooltip",
+                "value": {},
+                "on": [
+                    {"events": "rect:mouseover", "update": "datum"},
+                    {"events": "rect:mouseout", "update": "{}"},
+                ]
+            }],
+            "scales": [
+            {
+                "name": "xscale",
+                "type": "band",
+                "domain": {"data": "bins", "field": "roi"},
+                "range": "width",
+                "padding": 0.1,
+                "round": true
+            },
+            {
+                "name": "yscale",
+                "domain": {"data": "bins", "field": "number"},
+                "nice": true,
+                "range": "height"
+            }],
+            "axes": [
+            { "orient": "bottom", "scale": "xscale", "labels": false},
+            { "orient": "left", "scale": "yscale" }
+            ],
+            "marks": [
+            {
+                "type": "rect",
+                "from": {"data": "bins"},
+                "encode": {
+                    "enter": {
+                        "x": {"scale": "xscale", "field": "roi"},
+                        "width": {"scale": "xscale", "band": 1},
+                        "y": {"scale": "yscale", "field": "number"},
+                        "y2": {"scale": "yscale", "value": 0}
+                    },
+                    "update": {
+                        "fill": {"value": "steelblue"}
+                    },
+                    "hover": {
+                        "fill": {"value": "red"}
+                    }
+                }
+            },
+            { // Always display top 6
+                "type": "text",
+                "from": {"data": "bins"},
+                "encode": {
+                    "enter": {
+                        "align": {"value": "center"},
+                        "baseline": {"value": "bottom"},
+                        "fill": {"value": "#333"}
+                    },
+                    "update": {
+                        "x": {"scale": "xscale", field: "roi"},
+                        "y": {"scale": "yscale", field: 'number', "offset": -2},
+                        "text": {"data": "bins", "field": "top6roi" },
+                        "fill": {"value": "#333"}
+                    }
+                }
+            },
+            { // Show others on mouseover
+                "type": "text",
+                "encode": {
+                    "enter": {
+                        "align": {"value": "center"},
+                        "baseline": {"value": "bottom"},
+                        "fill": {"value": "#333"}
+                    },
+                    "update": {
+                        "x": {"scale": "xscale", "signal": "tooltip.roi"},
+                        "y": {"scale": "yscale", "signal": "tooltip.number", "offset": -2},
+                        "text": {"signal": "tooltip.roi"},
+                        "fillOpacity": [
+                            {"test": "isNaN(tooltip.roi)", "value": 1},
+                            {"value": 1}
+                        ]
+                    }
+                }
+            }]
+        };
+        // Display in the div
+        this.render(spec);
+    }
 }
 
-class BarGraphSimple {
-	constructor(params) {
-		this.dim = params.dim;
-		this.data = params.data;
-		this.labels = params.labels ?? null;
-		this.baseline = params.baseline ?? null;
-		this.meta = params.meta ?? null;
-	}
+class CommunitiesBarGraph extends VegaBarAdapter {
+    constructor(bar, div) {
+        super(div);
+        this.bar = bar; // main bar graph
+        this.bins = [];
+    }
 
-	draw(ctx) {
-		const min = Math.min(...this.data);
-		const max = Math.max(...this.data);
-		const dataCopy = [...this.data];
-		// Display 6 largest ROIs
-		dataCopy.sort((a,b) => b-a);
-		const bigLim = dataCopy[6];
-		// Make bars
-		const n = this.data.length;
-		const dx = (this.dim.w-50)/n
-		const bx = 0.8*dx;
-		const uh = this.dim.h-50;
-		const zy = max/(max-min)*uh+25;
-		const dy = uh/(max-min);
-		strokeLine(ctx, {x: 20, y: zy}, {x: this.dim.w-20, y: zy});
-		for (let i=0; i<n; i++) {
-			const y = zy-dy*this.data[i];
-			ctx.fillStyle = '#204e8a';
-			ctx.fillRect(i*dx+25, y, bx, zy-y);
-			if (this.baseline) {
-				const sumData = this.data.reduce((prev, cur) => prev+cur, 0);
-				const sumBase = this.baseline.reduce((prev, cur) => prev+cur, 0);
-				const by = zy-this.baseline[i]*sumData/sumBase*dy;
-				ctx.lineWidth = 3;
-				strokeLine(ctx, {x:i*dx+25, y: by}, {x: i*dx+25+bx, y: by}, '#f00');
-				ctx.lineWidth = 1;
-				const label = this.meta.CommunityNames[i];
-				ctx.fillStyle = '#000';
-				ctx.font = '8px Sans-serif';
-				ctx.fillText(label, i*dx+25-ctx.measureText(label).width/2+bx/2, Math.min(by, y)-10);
-			} else if (this.data[i] > bigLim) {
-				ctx.fillStyle = '#000';
-				ctx.font = '8px Sans-serif';
-				ctx.fillText(i, i*dx+25+3, y+2);
-			}
-		}
-		const ny = 6;
-		const _dy = (this.dim.h-50)/ny;
-		const _dyy = (max-min)/ny;
-		for (let i=0; i<=ny; i++) {
-			const x = 2;
-			const y = 25+i*_dy;
-			ctx.fillStyle = '#000';
-			ctx.font = '8px Sans-serif';
-			ctx.fillText((max-i*_dyy).toFixed(3), x, y);
-		}
-	}
+    repaint() {
+        this.repaintEmpty('Not implemented');
+    }
 }
 
-class BarGraph {
-	constructor(params) {
-		this.dim = params.dim;
+class BarGraph extends VegaBarAdapter {
+	constructor(div) {
+        super(div);
 		this.runs = [];
-		this.view = [0,20];
+		this.from = 0;
+        this.to = 20;
 		this.sorted = true;
 		this.abs = true;
-		this.composite = [];
+		this.composite = null;
+        this.labelsIdx = null;
+        this.selected = [];
 	}
 
-	click(p) {
-		this.bars.forEach(bar => {
-			if (bar.contains(p)) bar.selected = !bar.selected;
-		});
-	}
-
-	set displayLabels(display) {
-		this.display = display;
-		if (this.bars) this.bars.forEach(bar => bar.display = display);
-	}
-
-	mousemove(p) {
-		this.mouseout();
-		this.bars.forEach(bar => {
-			if (bar.contains(p)) bar.hovering = true;	
-		});
-	}
-
-	mouseout() {
-		this.bars.forEach(bar => bar.hovering = false);
-	}
+    get dim() {
+        const style = getComputedStyle(this.div);
+        return {w: parseInt(style.width), h: parseInt(style.height)};
+    }
 
 	recalc() {
 		this.composite = new Array(this.runs[0].Weights.length).fill(0);
 		this.runs.forEach(run => {
 			for (let i=0; i<this.composite.length; i++) {
-				this.composite[i] += run.Weights[i];
+				this.composite[i] += run.Weights[i]/this.composite.length;
 			}
 		});
 		if (this.abs) {
 			this.composite = this.composite.map(a => Math.abs(a));
 		}
-		const old = this.composite;
-		this.composite = zip(this.composite, this.runs[0].Labels);
+		this.min = Math.min(...this.composite);
+		this.max = Math.max(...this.composite);
+        // Indices for accessing labels
+		this.composite = this.composite.map((w, i) => [w,i]);
 		if (this.sorted) {
 			this.composite.sort((a,b) => b[0]-a[0]);
 		}
-		this.min = Math.min(...old);
-		this.max = Math.max(...old);
-		this.bars = [];
-		// Make bars
-		const n = this.view[1]-this.view[0];
-		console.assert(n > 0 && n < 1e5);
-		const dx = (this.dim.w-50)/n
-		const bx = 0.6*dx;
-		const uh = this.dim.h-50;
-		const zy = this.max/(this.max+Math.abs(this.min))*uh+25;
-		const dy = uh/(this.max-this.min);
-		for (let i=0, j=this.view[0], x=0; i<n; i++, j++, x+=dx) {
-			const y = zy-dy*this.composite[j][0];
-			this.bars.push(new Bar({
-				graph: this,
-				label: this.composite[j][1],
-				pos: {x: i*dx+25, y: y},
-				dim: {w: bx, h: Math.abs(y-zy)},
-				display: this.display
-			}));
-		}
-		this.zy = zy;
 	}
 
-	repaint(ctx) {
-		ctx.fillStyle = '#fff';
-		ctx.fillRect(0, 0, this.dim.w, this.dim.h);
-		strokeLine(ctx, {x: 20, y: this.zy}, {x: this.dim.w-20, y: this.zy});
-		let count = 0;
-		this.bars.forEach(bar => bar.draw(ctx, count++));
-		const ny = 6;
-		const dy = (this.dim.h-50)/ny;
-		const dyy = (this.max-this.min)/ny;
-		for (let i=0; i<=ny+.1; i++) {
-			const x = 2;
-			const y = 25+i*dy;
-			ctx.fillStyle = '#000';
-			ctx.font = '8px Sans-serif';
-			ctx.fillText((this.max-i*dyy).toFixed(3), x, y);
-		}
+	repaint() {
+        // Can graph even before data finishes loading
+        if (!this.composite || !this.runs[0].Labels) {
+            this.repaintEmpty('Data not loaded yet...');
+            return;
+        }
+        // Get data to be graphed
+        const values = [];
+        this.values = values;
+        for (let i=this.from; i<this.to; i++) {
+            const [w,idx] = this.composite[i];
+            let altW, offset;
+            if ((i-this.from)%2 == 0) {
+                altW = w;
+                offset = 0;
+            } else {
+                altW = 0;
+                offset = 16;
+            }
+            values.push({
+                idx: idx.toString(), 
+                weight: w, 
+                'alt-weight': altW, 
+                offset: offset, 
+                label: '', 
+                link: `#rect-select-${idx}`,
+                selected: this.selected.includes(idx)
+            });
+            if (this.labelsIdx || this.labelsIdx === 0) {
+                values.at(-1).label = this.runs[0].Labels[this.labelsIdx][idx];
+            }
+        }
+        const style = getComputedStyle(this.div);
+        const spec = {
+            "$schema": "https://vega.github.io/schema/vega/v5.json",
+            "width": parseInt(style.width)-80,
+            "height": parseInt(style.height)-60,
+            "padding": 0,
+            "data": [
+            {
+                "name": "weights",
+                "values": values
+            }],
+            /*"signals": [
+            {
+                "name": "tooltip",
+                "value": {},
+                "on": [
+                    {"events": "rect:mousedown", "update": "datum"},
+                ]
+            }],*/
+            "scales": [
+            {
+                "name": "xscale",
+                "type": "band",
+                "domain": {"data": "weights", "field": "idx"},
+                "range": "width",
+                "padding": 0.1,
+                "round": true
+            },
+            {
+                "name": "yscale",
+                "domain": {"data": "weights", "field": "weight"},
+                "nice": true,
+                "range": "height"
+            }],
+            "axes": [
+            { "orient": "bottom", "scale": "xscale", "labels": false},
+            { "orient": "left", "scale": "yscale" }
+            ],
+            "marks": [
+            {
+                "type": "rect",
+                "from": {"data": "weights"},
+                "encode": {
+                    "enter": {
+                        "x": {"scale": "xscale", "field": "idx"},
+                        "width": {"scale": "xscale", "band": 1},
+                        "y": {"scale": "yscale", "field": "weight"},
+                        "y2": {"scale": "yscale", "value": 0},
+                        href: {data: 'weight', field: 'link'}
+                    },
+                    "update": {
+                        fill: [
+                            {test: 'datum.selected', value: 'red'},
+                            {value: 'steelblue'}
+                        ],
+                    },
+                    "hover": {
+                        "fill": {"value": "red"},
+                        'cursor': {'value': 'pointer'},
+                    }
+                }
+            },
+            { // Alternate display text above and below bar
+                "type": "text",
+                "from": {"data": "weights"},
+                "encode": {
+                    "enter": {
+                        "align": {"value": "center"},
+                        "baseline": {"value": "bottom"},
+                        "fill": {"value": "#333"}
+                    },
+                    "update": {
+                        "x": {"scale": "xscale", field: "idx", offset: 12},
+                        "y": {"scale": "yscale", field: 'alt-weight', "offset": {data: 'weights', field: 'offset'}},
+                        "text": {"data": "bins", "field": "label" },
+                    }
+                }
+            }]
+        };
+        // Display in the div
+        this.render(spec);
 	}
+
+    toggle(idx) {
+        idx = parseInt(idx);
+        const i = this.selected.indexOf(idx);
+        if (i != -1) {
+            this.selected.splice(i, 1);
+        } else {
+            this.selected.push(idx);
+        }
+    }
 }
 
 class BoxPlot {
@@ -268,10 +477,10 @@ class BoxPlot {
 		this.barGraph.dim = dim;
 	}
 
-	set displayLabels(display) {
+	/*set displayLabels(display) {
 		this.display = display;
 		this.boxes.forEach(box => box.display = display);
-	}
+	}*/
 	
 	mousemove(p) {
 		this.mouseout();
@@ -301,7 +510,7 @@ class BoxPlot {
 			stats.push(dist.filter(val => (val-stats[2])>1.5*(val-stats[3]) || (val-stats[2])>1.5*(val-stats[4])));
 			this.stats[i] = stats;
 		}
-		this.stats = zip(this.stats, this.runs[0].Labels);
+		this.stats = zip(this.stats, this.runs[0].Labels[this.barGraph.labelsIdx]);
 		if (this.barGraph.sorted) {
 			this.stats.sort((a,b) => Math.abs(b[0][2])-Math.abs(a[0][2]));
 		}

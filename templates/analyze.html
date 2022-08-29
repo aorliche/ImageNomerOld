@@ -3,23 +3,60 @@
 <head>
 	<title>ImageNomeR | Analyze {{ id }} </title>
 	<link rel='stylesheet' href='/css/analyze.css'>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
 	<script src='/js/bar.js'></script>
 	<script src='/js/analyze.js'></script>
 </head>
 <body>
 <div id='content'>
 	<h2 id='{{ id }}' class='h-id'>{{ cache[id]['runs'][0]['desc'] }}</h2>
+    <a href='/'>Back</a><br>
+    <!--<a href='#' id='load-metadata'>Load Metadata</a><br>-->
 	<div id='left'>
 	<p>
-        <a href='/'>Back</a>
-        <a href='#' id='export-labels'>Export Labels</a>
-        <a href='#' id='load-metadata'>Load Metadata</a><br>
-		<button id='barBoxButton'>Box Plot</button>
-		<input type='checkbox' id='displayLabels' checked> Display Labels
-		<input type='checkbox' id='displayMeta'> Display Metadata
-		<span id='metaNotLoadedSpan'>(not loaded)</span>
+		<!--<button id='barBoxButton'>Box Plot</button>-->
+        Graph:
+        <select id='graph-select'>
+            <option>Bar</option>
+            <option>Box</option>
+        </select>
+        Labels:
+        <select id='label-select'>
+            <option>None</option>
+            {% for labelName in labelNames: %}
+            <option id='label-select-{{ label }}'>{{ labelName }}</option>
+            {% endfor %}
+        </select>
+        <br>
+        <a href='#' id='export-labels-a'>Export Labels</a>
 	</p>
-	<canvas id='mainCanvas' width=600 height=400></canvas>
+    <div id='main' class='empty'>Loading...</div>
+	</div>
+	<div id='right'>
+    View: 
+    <select id='side-graph-select'>
+        <option>None</option>
+        <option>Communities</option>
+        <option>Connections</option>
+        <option>Nilearn ROIs Plot</option>
+        <option>Nilearn Connections Plot</option>
+    </select>
+    <br>
+    Top Feat:
+    <div id='from-to-div'>
+        <label for='from-range'>From</label> 
+        <input type='range' id='from-range' min='0' max='{{ wLen }}' step='{{ wStep }}' value='0'>
+        <span id='from-span'>0</span>
+        <br>
+        <label for='to-range'>To</label> 
+        <input type='range' id='to-range' min='0' max='{{ wLen }}' step='{{ wStep }}' value='{{ wLen}}'>
+        <span id='to-span'>{{ wLen }}</span>
+    </div>
+    <div id='placeholder-div' style='display: block;' class='side empty'>No secondary graph selected</div>
+	<div id='communities-div' class='side'></div>
+	<div id='connections-div' class='side'></div>
+	<div id='nilearn-plot-div' class='side empty'>Plotting (wait a few seconds)...</div>
+	</div>
 	<p>{{ cache[id]['runs']|length }} runs, 
 		Accuracy: {{ accuracy }}&#xB1;{{ stddev }},
 		{{ cache[id]['runs'][0]['Weights']|length }} Features
@@ -35,22 +72,6 @@
 		</li>
 	{% endfor %}	
 	</ol>
-	</div>
-	<div id='right'>
-	<p>
-		<input type='radio' id='roisRadio' name='roisOrBfns' checked> ROIs
-		<input type='radio' id='bfnsRadio' name='roisOrBfns'> Brain Functional Networks
-		<span id='bfnMetaNotLoadedSpan'>(metadata not loaded)</span><br>
-		From <input type='range' id='fromRange' min='0' max='{{ wLen }}' step='{{ wStep }}' value='0'>
-		To <input type='range' id='toRange' min='0' max='{{ wLen }}' step='{{wStep }}' value='{{ wLen}}'>
-		<span id='rangeSpan'>0 - {{ wLen }}</span>
-	<p>
-	<canvas id='bfnCanvas' width=500 height=400></canvas><br>
-	<button id='plotRegionsButton'>Plot Regions</button>
-	<button id='plotConnectionsButton'>Plot Connections</button><br>
-	<div id='plotDiv'></div>
-	<!--<canvas id='popCanvas' width=500 height=400></canvas><br>-->
-	</div>
 </div>
 </body>
 </html>

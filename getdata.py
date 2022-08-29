@@ -1,5 +1,6 @@
 # Get dummy json data for working on web frontend
 
+import os
 import requests
 
 host = 'https://hunimal.org/Hackathon/data'
@@ -11,8 +12,9 @@ for file in files:
 
 	print(r.status_code)
 	if r.status_code != 200:
-		print('Something went wrong')
+		print(f'Something went wrong getting {file}')
 	else:
-		with open(file, 'wb') as f:
+        os.makedirs('data') if not os.path.exists('data')
+		with open(f'data/{file}', 'wb') as f:
 			f.write(r.content)
 		print('Done')

@@ -11,7 +11,8 @@
 	{% for id,item in cache.items(): %}
 		<li>
 			<a href='/analyze?id={{ id }}'>{{ id }}</a> - 
-				<span>{{ item['runs'][0]['desc'] }}, {{ item['runs']|length }} runs</span>
+		    <span>{{ item['runs'][0]['desc'] }}, {{ item['runs']|length }} runs</span><br>
+            <a href='/clear?id={{ id }}'>Clear</a>
 		</li>
 	{% endfor %}	
 	</ol>

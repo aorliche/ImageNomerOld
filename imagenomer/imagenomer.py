@@ -11,7 +11,7 @@ import nilearn.plotting as plotting
 import io
 import base64
 
-from power264 import power_rois
+from imagenomer.power264 import power_rois
 
 '''
 ImageNomeR Library
@@ -60,20 +60,26 @@ class JsonData(JsonBase):
         self.dict['runid'] = runid
         self.dict['desc'] = self.analysis.desc
         keys = set(self.dict.keys())
-        assert any(key in keys for key in ['Accuracy', 'RMSE'])
-        assert 'Train' in keys and 'Test' in keys 
-        assert len(self.dict['Train']) == len(self.dict['Test'])
-        assert len(self.dict['Train']) >= 2
-        assert 'Weights' in keys and 'Labels' in keys
-        assert len(self.dict['Weights']) == len(self.dict['Labels'])
+        assert any(key in keys for key in ['Accuracy', 'RMSE']), (
+            'Must have either Accuracy or RMSE')
+        assert 'Train' in keys and 'Test' in keys, (
+            'Must have train and test sets')
+        assert len(self.dict['Train']) == len(self.dict['Test']), (
+            'Must have same number of classes in train and test sets')
+        assert 'Weights' in keys, (
+            'Must have Weights')
+        assert all(len(self.dict['Weights']) == len(lab) for lab in self.analysis.labels), (
+            'All label lists must be same length as list')
         if len(self.analysis.prev) > 0:
-            assert self.analysis.prev[0]['Labels'] == self.dict['Labels']
-        if 'Error' in keys and self.analysis.subjects is not None:
-            assert isinstance(self.dict['Error'], dict) and set(self.dict['Error'].keys()) == self.analysis.subjects
+            assert len(self.analysis.prev[0]['Weights']) == len(self.dict['Weights']), (
+                'Number of weights must be same across all runs')
         return json.dumps(self.dict)
 
     def post(self):
         runid = self.analysis.runid
+        if runid == 0:
+            self.dict['LabelNames'] = self.analysis.label_names
+            self.dict['Labels'] = self.analysis.labels
         return self.analysis.postData(self.pack(runid))
 
 class JsonMetadata(JsonBase):
@@ -84,24 +90,16 @@ class JsonMetadata(JsonBase):
     def post(self):
         return self.analysis.postMetadata(self.pack())
 
-class JsonGeneMetadata(JsonMetadata):
-    def __init__(self, analysis):
-        super().__init__(analysis)
-
-    def pack(self):
-        return json.dumps(self.dict)
-
-class JsonFCMetadata(JsonMetadata):
+class JsonCommunityMetadata(JsonMetadata):
     '''
-    Idea here is that connections in the form of xxx-xxx are mapped to brain functional networks
-    1-14, determined by xxx
-
-    Not too much enforced here, except xxx-xxx format
+    Each feature is a member of one or more communities
+    Currently used for feature labels of type 'xxx-xxx' and brain functional networks (DMN, SMH, etc.)
+    Contains CommunityTemplate and CommunityMap fields
+    Optionally contains BaselineCounts field for brain functional networks
     '''
     def __init__(self, analysis):
         super().__init__(analysis)
-        pat = re.compile('\d+-\d+')
-        assert all(pat.fullmatch(label) for label in self.analysis.prev[0]['Labels'])   
+        assert 'CommunityMap' in self.dict and 'CommunityTemplate' in self.dict, 'Must have CommunityMap (dict) and CommunityTemplate (regex string)'
     
     def pack(self):
         return json.dumps(self.dict)
@@ -168,9 +166,13 @@ class Analysis:
     '''
     instances = []
 
-    def __init__(self, desc='test analysis', host='localhost', port=80, kill_others=True):
+    def __init__(self, desc='test analysis', label_names=None, labels=None, host='localhost', port=80, kill_others=True):
+        assert len(label_names) == len(labels), (
+            'label_names must have same length as number of types of labels')
         self.id = uuid.uuid4()
         self.desc = desc
+        self.label_names = label_names
+        self.labels = labels
         self.host = host
         self.prev = []
         self.runid = 0

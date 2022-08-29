@@ -5,176 +5,195 @@ function getCursorPosition(canvas, e) {
     return {x: x, y: y};
 }
 
-let barGraph = null;
-let boxPlot = null;
+var bar = null;
+var box = null;
+var sideCommunities = null;
+var sideConnections = null;
+
+var $ = q => document.querySelector(q);
+var $$ = q => [...document.querySelectorAll(q)];
 
 window.addEventListener('load', e => {
-	const hId = document.querySelector('.h-id');
-	const id = hId.id;
-	const runCheckboxes = document.querySelectorAll('#runs-list input[type=checkbox]');
-	const canvas = document.querySelector('#mainCanvas');
-	const ctx = canvas.getContext('2d');
-	const barBoxButton = document.querySelector('#barBoxButton');
-	const displayLabels = document.querySelector('#displayLabels');
-	const displayMeta = document.querySelector('#displayMeta');
-	const fromRange = document.querySelector('#fromRange');
-	const toRange = document.querySelector('#toRange');
-	const rangeSpan = document.querySelector('#rangeSpan');
-	const bfnCanvas = document.querySelector('#bfnCanvas');
-	const bfnsRadio = document.querySelector('#bfnsRadio');
-	const roisRadio = document.querySelector('#roisRadio');
-	const metaNotLoadedSpan = document.querySelector('#metaNotLoadedSpan');
-	const bfnMetaNotLoadedSpan= document.querySelector('#bfnMetaNotLoadedSpan');
-    const plotRegionsButton = document.querySelector('#plotRegionsButton');
-    const plotConnectionsButton = document.querySelector('#plotConnectionsButton');
-    const plotDiv = document.querySelector('#plotDiv');
-    const exportLabelsA = document.querySelector('#export-labels');
-    const loadMetadataA = document.querySelector('#load-metadata');
+	const runCheckboxes = $$('#runs-list input[type=checkbox]');
 
-	barGraph = new BarGraph({
-		dim: {w: canvas.width, h: canvas.height}
-	});
-	boxPlot = new BoxPlot(barGraph);
-		
-	barGraph.displayLabels = displayLabels.checked;
-	barGraph.displayMeta = displayMeta;
-	boxPlot.displayLabels = displayLabels.checked;
-	boxPlot.displayMeta = displayMeta;
+	bar = new BarGraph($('#main'));
+	box = new BoxPlot(bar);
+    sideCommunities = new CommunitiesBarGraph(bar, $('#communities-div'));
+    sideConnections = new ConnectionsBarGraph(bar, $('#connections-div'));
+
+    // Load data
+    let numLoaded = 0;
 
 	function dataLoadCb(run) {
-		barGraph.runs.push(run);
-		barGraph.recalc();
-		boxPlot.recalc();
-		barGraph.repaint(ctx);
+        // Run with labels goes at the front
+        if (run.Labels) bar.runs.splice(0,0,run);
+        else bar.runs.push(run);
+        // Don't kill the page
+        if (numLoaded == runCheckboxes.length) {
+            bar.recalc();
+            //box.recalc();
+            getActiveMainGraph().repaint();
+            getActiveSideGraph().repaint();
+        }
+        // Update checkbox
 		runCheckboxes.forEach(box => {
 			if (box.id == `run${run.runid}`) {
 				box.parentNode.querySelector('.loading').innerText = 'Complete!';
 			}
 		});
-		plotBfn();
-	}
-
-	function metadataLoadCb(meta) {
-		if (meta) {
-			barGraph.meta = meta;
-			boxPlot.meta = meta;
-			metaNotLoadedSpan.innerText = '';
-			bfnMetaNotLoadedSpan.innerText = '';
-		}
 	}
 
 	runCheckboxes.forEach(box => {
+        const aid = $('.h-id').id;
 		const runid = parseInt(box.id.substring(3));
 		// Get weights data
-		fetch(`/data?id=${id}&runid=${runid}`)
+		fetch(`/data?id=${aid}&runid=${runid}`)
 		.then(resp => resp.json())
-		.then(json => dataLoadCb(json))
-		.catch(err => console.log(err));
+		.then(json => {
+            numLoaded++;
+            dataLoadCb(json);
+        })
+		.catch(err => {
+            numLoaded++;
+            console.log(err);
+        });
 	});
 
-	// Get BFN metadata
+    // Load metadata
+    // Keep trying every 2 seconds
+	function metadataLoadCb(meta) {
+		if (meta) {
+            bar.meta = meta;
+            getActiveSideGraph().repaint();
+		}
+	}
+
     function loadMetadata() {
-        fetch(`/data?id=${id}&metadata`)
-        .then(resp => resp.json())
-        .then(json => metadataLoadCb(json))
-        .catch(err => console.log(err));
+        if (!bar.meta) {
+            const aid = $('.h-id').id;
+            fetch(`/data?id=${aid}&metadata`)
+            .then(resp => resp.json())
+            .then(json => metadataLoadCb(json))
+            .catch(err => console.log(err));
+            setTimeout(loadMetadata, 2000);
+        }
     }
 
     loadMetadata();
 
-	canvas.addEventListener('mousemove', e => {
-		const graph = barBoxButton.innerText == 'Box Plot' ? barGraph : boxPlot;
-		graph.mousemove(getCursorPosition(canvas, e));
-		graph.repaint(ctx);
-	});
+    // Placeholder div and nilearn-plot-div get a repaint method
+    $('#placeholder-div').repaint = () => null;
+    $('#nilearn-plot-div').repaint = () => null;
 
-	canvas.addEventListener('mouseout', e => {
-		const graph = barBoxButton.innerText == 'Box Plot' ? barGraph : boxPlot;
-		graph.mouseout();
-		graph.repaint(ctx);
-	});
+    function getActiveMainGraph() {
+        const idx = $('#graph-select').selectedIndex;
+		return idx == 0 ? bar : box;
+    }
 
-	canvas.addEventListener('click', e => {
-		const graph = barBoxButton.innerText == 'Box Plot' ? barGraph : boxPlot;
-		graph.click(getCursorPosition(canvas, e));
-		graph.repaint(ctx);
-	});
+    function getActiveSideGraph() {
+        const idx = $('#side-graph-select').selectedIndex;
+        switch (idx) {
+            case 0: return $('#placeholder-div');
+            case 1: return sideCommunities;
+            case 2: return sideConnections;
+            case 3: return $('#nilearn-plot-div');
+            case 4: return $('#nilearn-plot-div');
+        }
+    }
 
-	barBoxButton.addEventListener('click', e => {
-		e.preventDefault();
-		if (barBoxButton.innerText == 'Bar Graph') {
-			barBoxButton.innerText = 'Box Plot';
-			barGraph.repaint(ctx);	
-		} else {
-			if (barGraph.runs.length < 5) {
-				alert('Need at least 5 runs for box plot');
-			} else {
-				barBoxButton.innerText = 'Bar Graph';
-				boxPlot.repaint(ctx);
-			}
-		}
-	});
+    // Selecting features on the main graph
+    /*['mousemove', 'mouseout', 'click'].forEach(evtType => {
+        $('#mainCanvas').addEventListener(evtType, e => {
+		    const graph = getActiveMainGraph();
+            graph[evtType](getCursorPosition($('#mainCanvas'), e));
+		    graph.repaint();
+        });
+    });*/
 
-	displayLabels.addEventListener('change', e => {
-		barGraph.displayLabels = displayLabels.checked;
-		boxPlot.displayLabels = displayLabels.checked;
-		graph = barBoxButton.innerText == 'Box Plot' ? barGraph : boxPlot;
-		graph.repaint(ctx);
-	});
+    // Main graph select
+    $('#graph-select').addEventListener('change', e => {
+        getActiveMainGraph().recalc();
+        getActiveMainGraph().repaint();
+    });
 
-	displayMeta.addEventListener('change', e => {
-		graph = barBoxButton.innerText == 'Box Plot' ? barGraph : boxPlot;
-		graph.repaint(ctx);
-	});
+    // Label select
+    $('#label-select').addEventListener('change', e => {
+        const idx = $('#label-select').selectedIndex;
+        bar.labelsIdx = idx == 0 ? null : idx-1;
+        getActiveMainGraph().recalc();
+        getActiveMainGraph().repaint();
+    });
+
+    // Graph rect click (feature select)
+    window.addEventListener('hashchange', e => {
+        const [a,b,idx] = window.location.hash.substr(1).split('-');
+        if (a == 'rect' && b == 'select' && idx) {
+            bar.toggle(idx);
+            bar.repaint();
+        }
+    });
+
+    // Side graph select
+    $('#side-graph-select').addEventListener('change', e => {
+        $$('.side').forEach(side => {
+            side.style.display = 'none';
+        });
+        const active = getActiveSideGraph();
+        if (active instanceof VegaBarAdapter) {
+            active.div.style.display = 'block';
+        } else {
+            active.style.display = 'block';
+            // Plot image
+            if (e.target.selectedIndex == 3) {
+                consOrRegsRequest('regions');
+            } else if (e.target.selectedIndex == 4) {
+                consOrRegsRequest('connections');
+            }
+        }
+        active.repaint();
+    });
 
 	function rangeChange() {
-		const from = fromRange.value;
-		const to = toRange.value;
-		rangeSpan.innerText = `${from} - ${to}`;
-		plotBfn();
+		const from = parseInt($('#from-range').value);
+		const to = parseInt($('#to-range').value);
+		$('#from-span').innerText = from;
+		$('#to-span').innerText = to;
+        [sideCommunities, sideConnections].forEach(side => {
+            side.from = from;
+            side.to = to;
+            if (side == getActiveSideGraph()) {
+                side.repaint();
+            }
+        });
 	}
 
-	fromRange.addEventListener('input', e => rangeChange());
-	toRange.addEventListener('input', e => rangeChange());
-	roisRadio.addEventListener('change', e => plotBfn());
-	bfnsRadio.addEventListener('change', e => plotBfn());
+	$('#from-range').addEventListener('input', e => rangeChange());
+	$('#to-range').addEventListener('input', e => rangeChange());
 
-	const baselineCounts = [30,5,14,13,58,5,31,25,18,13,9,11,4,28].map(a => a/264);
+    // Set initial ranges
+    $('#from-range').dispatchEvent(new Event('input'));
+    $('#to-range').dispatchEvent(new Event('input'));
 
-	function plotBfn() {
-		const from = fromRange.value;
-		const to = toRange.value;
-		const bins = bfnsRadio.checked && barGraph.meta ? Array(14).fill(0) : Array(264).fill(0);
-		for (let i=Math.round(from); i<to; i++) {
-			const val = barGraph.composite[i][0];
-			const label = barGraph.composite[i][1];
-			let [a,b] = label.split('-').map(a => parseInt(a));
-			if (bfnsRadio.checked && barGraph.meta) {
-				a = barGraph.meta.CommunityMap[a];
-				b = barGraph.meta.CommunityMap[b];
-			}
-			bins[a] += val;
-			bins[b] += val;
-		}
-		const ctx = bfnCanvas.getContext('2d');
-		ctx.fillStyle = '#fff';
-		ctx.fillRect(0,0, bfnCanvas.width, bfnCanvas.height);
-		const baseline = (bfnsRadio.checked && barGraph.meta) ? baselineCounts : null;
-		const meta = (bfnsRadio.checked && barGraph.meta) ? barGraph.meta : null;
-		(new BarGraphSimple({data: bins, dim: {w: bfnCanvas.width, h: bfnCanvas.height}, baseline: baseline, meta: meta})).draw(ctx);
-	}
+	//const baselineCounts = [30,5,14,13,58,5,31,25,18,13,9,11,4,28].map(a => a/264);
 
+    // Plot image
 	function onlyUnique(value, index, self) {
 	  return self.indexOf(value) === index;
 	}
 
 	function getSelectedConnections(type) {
-		const items = barBoxButton.innerText == 'Box Plot' ? barGraph.bars : boxPlot.boxes;
-		let cons = [];
-		items.forEach(item => {
-			if (item.selected) cons.push(item.label);
-		});
-		cons = cons.map(c => c.split('-').map(r => parseInt(r)));
+        // Check that we have 'xxx-xxx' ROI information
+        const labelsIdx = getRoiRoiLabelsIdx(bar);
+        if (!labelsIdx || labelsIdx == 0) {
+            alert('No labels in dataset');
+            return;
+        }
+        const graph = getActiveMainGraph();
+        // Get 'xxx-xxx'
+        const labels = graph.selected.map(idx => bar.runs[0].Labels[labelsIdx][idx]);
+        // Convert to ROI pairs
+        const cons = labels.map(label => label.split('-').map(roi => parseInt(roi)));
+        console.log(cons);
 		if (type == 'regions') {
 			const regs = cons.flat().filter(onlyUnique);
 			return {regions: regs};
@@ -191,13 +210,15 @@ window.addEventListener('load', e => {
         const img = new Image();
         img.src = 'data:image/png;base64,' + json.b64;
         img.alt = 'nilearn plot';
-        plotDiv.innerHTML = '';
-        plotDiv.appendChild(img);
+        $('#nilearn-plot-div').innerHTML = '';
+        $('#nilearn-plot-div').appendChild(img);
 	}
 		
-	headers = {"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+	//headers = {"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+	headers = {"Content-Type": "application/json"}
 
     function consOrRegsRequest(consOrRegs) {
+        const aid = $('.h-id').id;
         const res = getSelectedConnections(consOrRegs);
         if ((res.connections && res.connections.length == 0) || 
             (res.regions && res.regions.length == 0)) {
@@ -205,7 +226,7 @@ window.addEventListener('load', e => {
             return;
         }
         e.preventDefault();
-        fetch(`/data?id=${id}&image=${consOrRegs}`, {
+        fetch(`/data?id=${aid}&image=${consOrRegs}`, {
             method: 'POST', 
             headers: headers, 
 			body: JSON.stringify(res)
@@ -214,13 +235,15 @@ window.addEventListener('load', e => {
 		.then(json => displayImage(json))
 		.catch(err => console.log(err));
     }
-    
-	plotRegionsButton.addEventListener('click', e => consOrRegsRequest('regions'));
-	plotConnectionsButton.addEventListener('click', e => consOrRegsRequest('connections'));
 
+   /* 
+	plotRegionsButton.addEventListener('click', e => consOrRegsRequest('regions'));
+	plotConnectionsButton.addEventListener('click', e => consOrRegsRequest('connections'));*/
+
+    // Export labels from the main graph
     function exportLabels() {
         const text = [];
-        if (barBoxButton.innerText == 'Box Plot') {
+        /*if (barBoxButton.innerText == 'Box Plot') {
             barGraph.bars.forEach(bar => {
                 text.push(bar.label);
             });
@@ -228,7 +251,11 @@ window.addEventListener('load', e => {
             boxPlot.boxes.forEach(box => {
                 text.push(box.label);
             });
-        }
+        }*/
+        const items = getActiveMainGraph() == bar ? bar.bars : box.boxes;
+        items.forEach(item => {
+            text.push(item.label);
+        });
         const file = new Blob([text.join('\n')], {type: "application/octet-stream"});
         const a = document.createElement("a");
         const url = URL.createObjectURL(file);
@@ -241,8 +268,13 @@ window.addEventListener('load', e => {
             window.URL.revokeObjectURL(url);
         }, 0);
     }
+
+    $('#export-labels-a').addEventListener('click', e => {
+        e.preventDefault();
+        exportLabels();
+    });
     
-    exportLabelsA.addEventListener('click', e => {
+    /*exportLabelsA.addEventListener('click', e => {
         e.preventDefault();
         exportLabels();
     });
@@ -250,5 +282,5 @@ window.addEventListener('load', e => {
     loadMetadataA.addEventListener('click', e => {
         e.preventDefault();
         loadMetadata();
-    });
+    });*/
 });
