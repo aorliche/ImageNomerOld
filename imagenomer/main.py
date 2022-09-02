@@ -52,6 +52,29 @@ class JsonSubjects(JsonBase):
     def post(self):
         return self.analysis.postSubjects(self.pack())
 
+'''
+Used to graph subject-to-subject or group-to-group similarity
+'''
+class JsonSimilarity(JsonBase):
+    def __init__(self, analysis, data):
+        super().__init__(analysis)
+        self.data = data
+
+    def pack(self, runid):
+        self.dict['runid'] = runid
+        keys = set(self.dict.keys())
+        assert 'Edges' in keys, 'Must contain Edges list of matrices'
+        assert 'From' in keys, 'Must contain From indices'
+        assert 'To' in keys, 'Must contain To indices'
+        return json.dumps(self.dict)
+    
+    def post(self):
+        runid = self.data.dict['runid']
+        return self.analysis.postSimilarity(self.pack(runid), runid)
+
+'''
+Send accuracy, train/test split, and weights for an algorithm run to the server
+'''
 class JsonData(JsonBase):
     def __init__(self, analysis):
         super().__init__(analysis)
@@ -85,7 +108,7 @@ class JsonData(JsonBase):
 class JsonMetadata(JsonBase):
     def __init__(self, analysis):
         super().__init__(analysis)
-        assert len(analysis.prev) > 0, 'Load a run before adding metadata'
+        #assert len(analysis.prev) > 0, 'Load a run before adding metadata'
 
     def post(self):
         return self.analysis.postMetadata(self.pack())
@@ -94,14 +117,16 @@ class JsonCommunityMetadata(JsonMetadata):
     '''
     Each feature is a member of one or more communities
     Currently used for feature labels of type 'xxx-xxx' and brain functional networks (DMN, SMH, etc.)
-    Contains CommunityTemplate and CommunityMap fields
-    Optionally contains BaselineCounts field for brain functional networks
+    Contains Template, CommunityMap, and CommunityNames fields (required) 
+    Optionally contains CommunityExpected field for brain functional networks
     '''
     def __init__(self, analysis):
         super().__init__(analysis)
-        assert 'CommunityMap' in self.dict and 'CommunityTemplate' in self.dict, 'Must have CommunityMap (dict) and CommunityTemplate (regex string)'
     
     def pack(self):
+        assert 'CommunityMap' in self.dict, 'Must have CommunityMap'
+        assert 'CommunityNames' in self.dict, 'Must have CommunityNames'
+        assert 'Template' in self.dict, 'Must have Template'
         return json.dumps(self.dict)
 
 def toB64String(fig):
@@ -216,6 +241,11 @@ class Analysis:
     def postMetadata(self, meta):
         url = f'http://{self.host}:{self.port}/post?id={self.id}&type=metadata'
         r = requests.post(url, headers=self.headers, data=meta);
+        return r
+    
+    def postSimilarity(self, sim, runid):
+        url = f'http://{self.host}:{self.port}/post?id={self.id}&runid={runid}&type=similarity'
+        r = requests.post(url, headers=self.headers, data=sim);
         return r
 
     def postSubjects(self, subjects):

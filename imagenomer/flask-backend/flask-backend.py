@@ -19,6 +19,11 @@ cache = {}
 
 @app.route('/')
 def index():
+    items = {}
+    for item in cache.values():
+        accs = np.array([run['Accuracy'] for run in item['runs']])
+        item['acc'] = round(np.mean(accs), 3)
+        item['std'] = round(np.std(accs), 3)
     return render_template('index.html', cache=cache)
 
 @app.route('/analyze')
@@ -106,6 +111,19 @@ def post():
                 initCache(args['id'])
             cache[args['id']]['metadata'] = request.json
             return 'Success'
+        elif typ == 'similarity':
+            if args['id'] not in cache:
+                return f'id {args["id"]} not in cache'
+            if 'runid' not in args:
+                return 'missing runid'
+            runs = cache[args['id']]['runs']
+            for run in runs:
+                if run['runid'] == int(args['runid']):
+                    # Can overwrite old similarity for run
+                    sim = request.json
+                    run['sim'] = sim
+                    return 'Success'
+            return f'runid {args["runid"]} not in runs data'
         elif typ == 'image':
             if args['id'] not in cache:
                 return f'id {args["id"]} not in cache'

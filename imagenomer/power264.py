@@ -1,5 +1,30 @@
 import numpy as np
+import os
 
+dirname = os.path.dirname(__file__)
+
+power_comm_names = None
+with open(f'{dirname}/power/power264CommunityNames.txt', 'r') as f:
+    power_comm_names = f.readlines()
+
+power_comm_names_short = 'SMH,SMM,CNG,AUD,DMN,MEM,VIS,FRT,SAL,SUB,VTR,DRL,CB,UNK'.split(',')
+
+power_comm_affil_idcs = {}
+power_comm_affil = {}
+with open(f'{dirname}/power/power264CommunityAffiliation.1D', 'r') as f:
+    for roi,line in enumerate(f.readlines()):
+        idx = int(line)-1
+        power_comm_affil_idcs[roi] = idx
+        power_comm_affil[roi] = power_comm_names_short[idx]
+
+power_comm_expected = [30,5,14,13,58,5,31,25,18,13,9,11,4,28]
+#power_comm_expected = list(np.bincount(np.array(list(power_comm_affil_idcs.values()))).astype('int32'))
+
+if __name__ == '__main__':
+    print(power_comm_names_short)
+    print(power_comm_expected)
+
+#TODO load these from file
 power_rois = np.array([
     [-25, -98, -12],
     [ 27, -97, -13],

@@ -1,2 +1,1 @@
 
-from imagenomer.imagenomer import *

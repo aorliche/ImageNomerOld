@@ -2,20 +2,39 @@
 <html>
 <head>
 	<title>ImageNomeR | {{ cache|length }} Analyses</title>
+	<link rel='stylesheet' href='/css/index.css'>
 </head>
 <body>
+<div id='content'>
+    <h1>ImageNomeR <a href='https://github.com/aorliche/ImageNomeR/'>GitHub</a></h1>
+    <p>Analysis front-end</p>
 {% if cache|length == 0 %}
-	<p>No analyses loaded</p>
+	<h2>No analyses loaded</h2>
 {% else %}
+    <h2>Analyses</h2>
 	<ol>
 	{% for id,item in cache.items(): %}
 		<li>
-			<a href='/analyze?id={{ id }}'>{{ id }}</a> - 
-		    <span>{{ item['runs'][0]['desc'] }}, {{ item['runs']|length }} runs</span><br>
+			<a href='/analyze?id={{ id }}'>{{ id }}</a><br>
+		    <span class='desc'>{{ item['runs'][0]['desc'] }}</span><br>
+            <span class='runs'>{{ item['runs']|length }} runs</span>,
+            <span class='acc'>Accuracy: {{ item['acc'] }}&#xB1;{{ item['std'] }}</span>
             <a href='/clear?id={{ id }}'>Clear</a>
 		</li>
 	{% endfor %}	
 	</ol>
 {% endif %}
+    <h4 id='pre-about'>About:</h4>
+    <ul id='about'>
+        <li>ImageNomeR is a tool to quickly explore feature importance in functional connectivity data.</li>
+        <li>Some features are useful for generic ML, e.g. the omics example</li>
+        <li>It specifically visualizes task-specific similarities, such as those created by the
+        <a href='https://github.com/aorliche/LatentSimilarity/'>Latent Similarity</a> tool.</li>
+    </ul>
+    <div id='footer'>
+        Please email me about any suggestions or bugs: 
+        <a href='mailto:aorlichenko@tulane.edu'>aorlichenko@tulane.edu</a>.
+    </div>
+</div>
 </body>
 </html>

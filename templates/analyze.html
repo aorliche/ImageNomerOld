@@ -5,57 +5,81 @@
 	<link rel='stylesheet' href='/css/analyze.css'>
     <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
 	<script src='/js/bar.js'></script>
+	<script src='/js/matrix.js'></script>
+    <script src='/js/line.js'></script>
 	<script src='/js/analyze.js'></script>
 </head>
 <body>
 <div id='content'>
-	<h2 id='{{ id }}' class='h-id'>{{ cache[id]['runs'][0]['desc'] }}</h2>
-    <a href='/'>Back</a><br>
-    <!--<a href='#' id='load-metadata'>Load Metadata</a><br>-->
+    <div id='pre-description'>Analysis Description:</div>
+	<div id='description' data-id='{{ id }}'>{{ cache[id]['runs'][0]['desc'] }}</div>
+    <div>
+        <a href='/'>Main</a>
+        <a href='/analyze?id={{ id }}'>Reload</a>
+        <a href='#load-metadata' id='load-metadata'>Load Metadata</a><br>
+    </div>
 	<div id='left'>
-	<p>
-		<!--<button id='barBoxButton'>Box Plot</button>-->
-        Graph:
-        <select id='graph-select'>
-            <option>Bar</option>
-            <option>Box</option>
-        </select>
-        Labels:
-        <select id='label-select'>
-            <option>None</option>
-            {% for labelName in labelNames: %}
-            <option id='label-select-{{ label }}'>{{ labelName }}</option>
-            {% endfor %}
-        </select>
-        <br>
-        <a href='#' id='export-labels-a'>Export Labels</a>
-	</p>
-    <div id='main' class='empty'>Loading...</div>
+        <div class='above'>
+            Graph:
+            <select id='graph-select'>
+                <option>Bar</option>
+                <option>Box</option>
+            </select>
+            Labels:
+            <select id='label-select'>
+                <option>None</option>
+                {% for labelName in labelNames: %}
+                <option id='label-select-{{ label }}'>{{ labelName }}</option>
+                {% endfor %}
+            </select>
+            <br>
+            <a href='#' id='export-labels-a'>Export Labels</a>
+        </div>
+        <div id='main' class='empty'>Loading...</div>
 	</div>
 	<div id='right'>
-    View: 
-    <select id='side-graph-select'>
-        <option>None</option>
-        <option>Communities</option>
-        <option>Connections</option>
-        <option>Nilearn ROIs Plot</option>
-        <option>Nilearn Connections Plot</option>
-    </select>
-    <br>
-    Top Feat:
-    <div id='from-to-div'>
-        <label for='from-range'>From</label> 
-        <input type='range' id='from-range' min='0' max='{{ wLen }}' step='{{ wStep }}' value='0'>
-        <span id='from-span'>0</span>
-        <br>
-        <label for='to-range'>To</label> 
-        <input type='range' id='to-range' min='0' max='{{ wLen }}' step='{{ wStep }}' value='{{ wLen}}'>
-        <span id='to-span'>{{ wLen }}</span>
-    </div>
-    <div id='placeholder-div' style='display: block;' class='side empty'>No secondary graph selected</div>
-	<div id='communities-div' class='side'></div>
-	<div id='connections-div' class='side'></div>
-	<div id='nilearn-plot-div' class='side empty'>Plotting (wait a few seconds)...</div>
+        <div class='above'>
+            View: 
+            <select id='side-graph-select'>
+                <option>None</option>
+                <option>Communities</option>
+                <option>Connections</option>
+                <option>Nilearn ROIs Plot</option>
+                <option>Nilearn Connections Plot</option>
+            </select>
+            <br>
+            <!-- Connections and Communities top features range -->
+            <div id='from-to-div' style='display: none;' class='side-opt'>
+                <label for='from-range'>Feat From</label> 
+                <input type='range' id='from-range' min='0' max='{{ wLen }}' step='{{ wStep }}' value='0'>
+                <span id='from-span'>0</span>
+                <br>
+                <label for='to-range'>Feat To</label> 
+                <input type='range' id='to-range' min='0' max='{{ wLen }}' step='{{ wStep }}' value='{{ wLen}}'>
+                <span id='to-span'>{{ wLen }}</span>
+            </div>
+            <!-- Select groups -->
+            <div id='group-select-div' class='side-opt'></div>
+            <!-- Select individual similarity -->
+            <div id='similarity-from-to-div' class='side-opt'>
+                <select>
+                    <option>From</option>
+                    <option>To</option>
+                </select>
+            </div>
+            <!-- Individual similarity menu -->
+            <div id='subject-similarity-menu-div' class='side-opt'>
+                <a id='subject-similarity-back-a' href='#'>Back</a>
+                <a id='subject-similarity-from-a' href='#'>From</a>
+                <a id='subject-similarity-to-a' href='#'>To</a>
+            </div>
+        </div>
+        <!-- Side plot -->
+        <div id='placeholder-div' style='display: block;' class='side empty side-opt'>No secondary graph selected</div>
+        <div id='communities-div' class='side side-opt'></div>
+        <div id='connections-div' class='side side-opt'></div>
+        <div id='nilearn-plot-div' class='side empty side-opt'>Plotting (wait a few seconds)...</div>
+        <div id='similarity-run-div' class='side empty side-opt'>No similarity matrix for this run</div>
 	</div>
 	<p>{{ cache[id]['runs']|length }} runs, 
 		Accuracy: {{ accuracy }}&#xB1;{{ stddev }},
@@ -69,6 +93,10 @@
 				Train: {{ run['Train'].__str__() }}, 
 				Test: {{ run['Test'].__str__() }}</span> 
 			<span class='loading'>Loading...</span>
+            <!-- If we have similarity for a run -->
+            {% if run['sim'] %}
+            <a href='#view-similarity-run-{{ run["runid"] }}'>View Similarity Matrix</a>
+            {% endif %}
 		</li>
 	{% endfor %}	
 	</ol>

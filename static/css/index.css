@@ -1,0 +1,30 @@
+body {
+    background-color: #def;
+}
+#content {
+	width: 1260px;
+	display: block;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 10px;
+    font-size: 12px;
+}
+h1 {
+    background-color: #cdf;
+    color: #333;
+    padding: 10px;
+    font-size: 20px;
+    margin-top: 0px;
+    border-radius: 10px;
+}
+h1 a {
+    font-weight: normal;
+    font-size: 12px;
+    color: default;
+}
+h2 {
+    padding: 10px;
+    margin-top: 0px;
+    font-size: 18px;
+}

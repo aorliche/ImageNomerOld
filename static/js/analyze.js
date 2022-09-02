@@ -17,9 +17,11 @@ window.addEventListener('load', e => {
 	const runCheckboxes = $$('#runs-list input[type=checkbox]');
 
 	bar = new BarGraph($('#main'));
-	box = new BoxPlot(bar);
+	box = new BoxPlot($('#main'), bar);
     sideCommunities = new CommunitiesBarGraph(bar, $('#communities-div'));
     sideConnections = new ConnectionsBarGraph(bar, $('#connections-div'));
+    sideSimilarityMatrix = new SimilarityMatrix(bar, $('#similarity-run-div'));
+    sideSimilarityLine = new SimilarityLineGraph(bar, $('#similarity-run-div'));
 
     // Load data
     let numLoaded = 0;
@@ -31,7 +33,13 @@ window.addEventListener('load', e => {
         // Don't kill the page
         if (numLoaded == runCheckboxes.length) {
             bar.recalc();
-            //box.recalc();
+            // If we have Labels, show the first one
+            const select = $('#label-select');
+            if (select.options.length > 1) {
+                select.options.selectedIndex = 1;
+                bar.labelsIdx = 0;
+            }
+            // Display
             getActiveMainGraph().repaint();
             getActiveSideGraph().repaint();
         }
@@ -44,7 +52,7 @@ window.addEventListener('load', e => {
 	}
 
 	runCheckboxes.forEach(box => {
-        const aid = $('.h-id').id;
+        const aid = $('#description').dataset.id;
 		const runid = parseInt(box.id.substring(3));
 		// Get weights data
 		fetch(`/data?id=${aid}&runid=${runid}`)
@@ -60,23 +68,29 @@ window.addEventListener('load', e => {
 	});
 
     // Load metadata
-    // Keep trying every 2 seconds
+    // Try once, then wait for user to click link
+    // Old behavior was to keep trying every 5 seconds
+    // Replace matching templates
 	function metadataLoadCb(meta) {
-		if (meta) {
-            bar.meta = meta;
-            getActiveSideGraph().repaint();
-		}
+        let found = false;
+        for (let i=0; i<bar.meta.length; i++) {
+            if (bar.meta[i].Template == meta.Template) {
+                bar.meta[i] = meta;
+                found = true;
+            }
+        }
+        if (!found) bar.meta.push(meta);
+        if (getActiveSideGraph() == sideCommunities)
+            sideCommunities.repaint();
 	}
 
+    // We filter old metadata by template
     function loadMetadata() {
-        if (!bar.meta) {
-            const aid = $('.h-id').id;
-            fetch(`/data?id=${aid}&metadata`)
-            .then(resp => resp.json())
-            .then(json => metadataLoadCb(json))
-            .catch(err => console.log(err));
-            setTimeout(loadMetadata, 2000);
-        }
+        const aid = $('#description').dataset.id;
+        fetch(`/data?id=${aid}&metadata`)
+        .then(resp => resp.json())
+        .then(json => metadataLoadCb(json))
+        .catch(err => console.log(err));
     }
 
     loadMetadata();
@@ -101,15 +115,6 @@ window.addEventListener('load', e => {
         }
     }
 
-    // Selecting features on the main graph
-    /*['mousemove', 'mouseout', 'click'].forEach(evtType => {
-        $('#mainCanvas').addEventListener(evtType, e => {
-		    const graph = getActiveMainGraph();
-            graph[evtType](getCursorPosition($('#mainCanvas'), e));
-		    graph.repaint();
-        });
-    });*/
-
     // Main graph select
     $('#graph-select').addEventListener('change', e => {
         getActiveMainGraph().recalc();
@@ -124,23 +129,96 @@ window.addEventListener('load', e => {
         getActiveMainGraph().repaint();
     });
 
-    // Graph rect click (feature select)
+    // Events from graphs and links based on anchor hash change
     window.addEventListener('hashchange', e => {
-        const [a,b,idx] = window.location.hash.substr(1).split('-');
-        if (a == 'rect' && b == 'select' && idx) {
-            bar.toggle(idx);
-            bar.repaint();
+        const parts = window.location.hash.substr(1).split('-');
+        // Graph rect click (feature select)
+        if (parts[0] == 'rect' && parts[1] == 'select') {
+            getActiveMainGraph().toggle(parts[2]);
+            getActiveMainGraph().repaint();
+        // View similarity matrix for one of the runs
+        } else if (parts[0] == 'view' && parts[1] == 'similarity' && parts[2] == 'run' && parts.length == 4) {
+            // Update display
+            $$('.side-opt').forEach(side => {
+                side.style.display = 'none';
+            });
+            $('#similarity-run-div').style.display = 'block';
+            $('#group-select-div').style.display = 'inline-block';
+            $('#similarity-from-to-div').style.display = 'inline-block';
+            const runidx = parseInt(parts[3]);
+            sideSimilarityMatrix.repaint(runidx);
+            // Remove previous groups selector
+            $('#group-select-div').innerHTML = '';
+            // Add new groups
+            if (bar.runs[runidx].sim && bar.runs[runidx].sim.Groups) {
+                // Add groups selector
+                const groups = bar.runs[runidx].sim.Groups;
+                const select = document.createElement('select');
+                let opt = document.createElement('option');
+                let count = 1;
+                opt.innerText = 'None';
+                select.appendChild(opt);
+                for (const name in groups) {
+                    opt = document.createElement('option');
+                    opt.innerText = name;
+                    select.appendChild(opt);
+                    // Previously selected group
+                    if (name == bar.groupSelect) {
+                        select.selectedIndex = count++;
+                    }
+                };
+                // Repaint the particular group
+                select.addEventListener('change', e => {
+                    bar.groupSelect = select.options[select.selectedIndex].text;
+                    sideSimilarityMatrix.repaint(runidx);
+                });
+                // Add to UI
+                const text = document.createTextNode('Group:');
+                const div = $('#group-select-div');
+                div.innerHTML = '';
+                div.appendChild(text);
+                div.appendChild(select);
+            }
+        // View similarity line graph for one subject in one run
+        } else if (parts[0] == 'view' && parts[1] == 'similarity' && parts[2] == 'run' && parts[3] == 'from' && parts[4] == 'to' && parts.length > 6) {
+            // Update display
+            $$('.side-opt').forEach(side => {
+                side.style.display = 'none';
+            });
+            $('#similarity-run-div').style.display = 'block';
+            $('#subject-similarity-menu-div').style.display = 'block';
+            // Parse args
+            const runidx = parseInt(parts[5]);
+            const from = parseInt(parts[6]);
+            const to = parseInt(parts[7]);
+            // Get the from or to choice
+            // May be specified in hash
+            const select = $('#similarity-from-to-div select');
+            if (parts[8] == 'from') {
+                select.selectedIndex = 0;
+            } else if (parts[8] == 'to') {
+                select.selectedIndex = 1;
+            }
+            const fromTo = select.selectedIndex == 0 ? {from: from} : {to: to};
+            // Fill in return menu
+            $('#subject-similarity-back-a').href = `#view-similarity-run-${runidx}`;
+            $('#subject-similarity-from-a').href = `#view-similarity-run-from-to-${runidx}-${from}-${to}-from`;
+            $('#subject-similarity-to-a').href = `#view-similarity-run-from-to-${runidx}-${from}-${to}-to`;
+            sideSimilarityLine.repaint(runidx, fromTo);
         }
     });
 
     // Side graph select
     $('#side-graph-select').addEventListener('change', e => {
-        $$('.side').forEach(side => {
+        // Update display
+        $$('.side-opt').forEach(side => {
             side.style.display = 'none';
         });
         const active = getActiveSideGraph();
-        if (active instanceof VegaBarAdapter) {
+        if (active instanceof VegaDivAdapter) {
+            // Communities and connections
             active.div.style.display = 'block';
+            $('#from-to-div').style.display = 'inline-block';
         } else {
             active.style.display = 'block';
             // Plot image
@@ -174,8 +252,6 @@ window.addEventListener('load', e => {
     $('#from-range').dispatchEvent(new Event('input'));
     $('#to-range').dispatchEvent(new Event('input'));
 
-	//const baselineCounts = [30,5,14,13,58,5,31,25,18,13,9,11,4,28].map(a => a/264);
-
     // Plot image
 	function onlyUnique(value, index, self) {
 	  return self.indexOf(value) === index;
@@ -185,7 +261,7 @@ window.addEventListener('load', e => {
         // Check that we have 'xxx-xxx' ROI information
         const labelsIdx = getRoiRoiLabelsIdx(bar);
         if (!labelsIdx || labelsIdx == 0) {
-            alert('No labels in dataset');
+            $('#nilearn-plot-div').innerText = 'No labels in dataset';
             return;
         }
         const graph = getActiveMainGraph();
@@ -218,11 +294,11 @@ window.addEventListener('load', e => {
 	headers = {"Content-Type": "application/json"}
 
     function consOrRegsRequest(consOrRegs) {
-        const aid = $('.h-id').id;
+        const aid = $('#description').dataset.id;
         const res = getSelectedConnections(consOrRegs);
         if ((res.connections && res.connections.length == 0) || 
             (res.regions && res.regions.length == 0)) {
-            alert('No connections selected');
+            $('#nilearn-plot-div').innerText = 'No connections selected';
             return;
         }
         e.preventDefault();

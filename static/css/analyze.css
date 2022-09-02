@@ -1,41 +1,50 @@
 body {
-	text-align: center;
+    background-color: #def;
+    font-size: 12px;
 }
-#mainCanvas {
-	border: 1px solid black;
+#description {
+    background-color: #cdf;
+    color: #333;
+    padding: 10px;
+    margin: 5px;
+    margin-left: 10px;
+    border-radius: 10px;
 }
 .navigation {
 	margin-top: 5px;
 	margin-bottom: 5px;
 }
 #content {
-	width: 1280px;
+	width: 1260px;
 	display: block;
-	text-align: left;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 10px;
+}
+#left, #right {
+	width: 620px;
+	display: inline-block;
+	vertical-align: top;
+    margin-top: 5px;
 }
 #left {
-	width: 600px;
-	display: inline-block;
-	vertical-align: top;
-	margin-right: 40px;
+	margin-right: 10px;
 }
-#right {
-	width: 600px;
-	display: inline-block;
-	vertical-align: top;
-}
-#runs-list {
-	max-height: 300px;
-	overflow-y: scroll;
-	border: 1px solid black;
+.above {
+    min-height: 85px;
 }
 #main, .side {
     display: none;
-    width: 600px;
-    height: 400px;
+    width: 620px;
+    height: 500px;
     border: 2px solid #ccc;
     padding: 20px;
     box-sizing: border-box;
+    margin-top: 10px;
+}
+.side-opt {
+    display: none;
 }
 #main {
     display: block;
@@ -55,7 +64,7 @@ body {
 #from-to-div label {
     display: inline-block;
     vertical-align: top;
-    width: 50px;
+    width: 80px;
 }
 #from-span, #to-span {
     vertical-align: top;
@@ -63,4 +72,10 @@ body {
 #nilearn-plot-div img {
     width: 95%;
     max-height: 80%;
+}
+#group-select-div > select {
+    padding-left: 5px;
+}
+#similarity-from-to-div {
+    display: none;
 }

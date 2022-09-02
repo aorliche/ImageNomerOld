@@ -6,6 +6,12 @@ function range(end) {
     return [...Array(end).keys()];
 }
 
+function sum(arr) {
+    let s = 0;
+    arr.forEach(elt => s += elt);
+    return s;
+}
+
 // Label index of bar graph in form 'xxx-xxx'
 // The labeled (Labels, LabelNames) run is always at position 0, all other runs are unlabeled
 function getRoiRoiLabelsIdx(graph) {
@@ -18,15 +24,7 @@ function getRoiRoiLabelsIdx(graph) {
     return labelsIdx;
 }
 
-/*function strokeLine(ctx, p0, p1, color) {
-	ctx.strokeStyle = color ?? '#000';
-	ctx.beginPath();
-	ctx.moveTo(p0.x, p0.y);
-	ctx.lineTo(p1.x, p1.y);
-	ctx.stroke();
-}*/
-
-class VegaBarAdapter {
+class VegaDivAdapter {
     constructor(div) {
         this.div = div;
         this.view = null;
@@ -53,100 +51,7 @@ class VegaBarAdapter {
     }
 }
 
-/*class Bar extends VegaBarAdapter {
-	constructor(params) {
-		this.idx = params.idx;
-		this.graph = params.graph;
-		this.pos = params.pos;
-		this.dim = params.dim;
-		this.color = params.color ?? '#204e8a';
-		this.hoverColor = params.hoverColor ?? '#630094';
-		this.display = params.display ?? true;
-	}
-
-	contains(p) {
-		return p.x > this.pos.x && p.x < this.pos.x+this.dim.w &&
-			p.y > this.pos.y && p.y < this.pos.y+this.dim.h;
-	}
-
-	draw(ctx, n) {
-		n = n ?? 0;
-		ctx.fillStyle = (this.hovering || this.selected) ? this.hoverColor : this.color;
-		ctx.fillRect(this.pos.x, this.pos.y, this.dim.w, this.dim.h);
-		if (this.hovering || this.selected || this.display) {
-			const y = (n%2 == 0) ? this.pos.y-12 : this.pos.y+this.dim.h+12;
-			ctx.fillStyle = '#000';
-			ctx.font = 'normal 8px Sans-serif';
-			//const label = this.graph.displayMeta.checked && this.graph.meta ? this.metaLabel : this.label;
-            if (this.graph.labelsIdx || this.graph.labelsIdx === 0) {
-                const label = this.graph.runs[0].Labels[this.graph.labelsIdx][this.idx];
-                const labelWidth = ctx.measureText(label).width;
-                ctx.fillText(label, this.pos.x-labelWidth/2+this.dim.w/2, y);
-            }
-		}
-	}
-
-	get metaLabel() {
-		let [a,b] = this.label.split('-');
-		a = this.graph.meta.CommunityNames[this.graph.meta.CommunityMap[parseInt(a)]];
-		b = this.graph.meta.CommunityNames[this.graph.meta.CommunityMap[parseInt(b)]];
-		return `${a}-${b}`;
-	}
-}
-
-class Box {
-	constructor(params) {
-		this.label = params.label;
-		this.graph = params.graph;
-		this.outerPos = params.outerPos;
-		this.innerPos = params.innerPos;
-		this.outerDim = params.outerDim; 
-		this.innerDim = params.innerDim;
-		this.median = params.median;
-		this.outliers = params.outliers;
-		this.color = params.color ?? '#204e8a';
-		this.hoverColor = params.hoverColor ?? '#630094';
-		this.display = params.display ?? true;
-	}
-	
-	contains(p) {
-		return p.x > this.innerPos.x && p.x < this.innerPos.x+this.innerDim.w &&
-			p.y > this.innerPos.y && p.y < this.innerPos.y+this.innerDim.h;
-	}
-	
-	draw(ctx, n) {
-		ctx.fillStyle = (this.hovering || this.selected) ? this.hoverColor : this.color;
-		ctx.fillRect(this.innerPos.x, this.innerPos.y, this.innerDim.w, this.innerDim.h);
-		strokeLine(ctx, this.outerPos, {x: this.outerPos.x+this.outerDim.w, y: this.outerPos.y});
-		strokeLine(
-			ctx,
-			{x: this.outerPos.x, y: this.outerPos.y+this.outerDim.h}, 
-			{x: this.outerPos.x+this.outerDim.w, y: this.outerPos.y+this.outerDim.h}
-		);
-		strokeLine(
-			ctx,
-			{x: this.outerPos.x+0.5*this.outerDim.w, y: this.outerPos.y},
-			{x: this.outerPos.x+0.5*this.outerDim.w, y: this.outerPos.y+this.outerDim.h}
-		);
-		if (this.hovering || this.selected || this.display) {
-			const y = (n%2 == 0) ? this.innerPos.y-12 : this.innerPos.y+this.innerDim.h+12;
-			ctx.fillStyle = '#000';
-			ctx.font = 'normal 8px Sans-serif';
-			const label = this.graph.displayMeta.checked && this.graph.meta ? this.metaLabel : this.label;
-			const labelWidth = ctx.measureText(label).width;
-			ctx.fillText(label, this.innerPos.x-labelWidth/2+this.innerDim.w/2, y);
-		}
-	}
-	
-	get metaLabel() {
-		let [a,b] = this.label.split('-');
-		a = this.graph.meta.CommunityNames[this.graph.meta.CommunityMap[parseInt(a)]];
-		b = this.graph.meta.CommunityNames[this.graph.meta.CommunityMap[parseInt(b)]];
-		return `${a}-${b}`;
-	}
-}*/
-
-class ConnectionsBarGraph extends VegaBarAdapter {
+class ConnectionsBarGraph extends VegaDivAdapter {
     constructor(bar, div) {
         super(div);
         this.bar = bar; // main bar graph
@@ -282,7 +187,7 @@ class ConnectionsBarGraph extends VegaBarAdapter {
     }
 }
 
-class CommunitiesBarGraph extends VegaBarAdapter {
+class CommunitiesBarGraph extends VegaDivAdapter {
     constructor(bar, div) {
         super(div);
         this.bar = bar; // main bar graph
@@ -290,11 +195,160 @@ class CommunitiesBarGraph extends VegaBarAdapter {
     }
 
     repaint() {
-        this.repaintEmpty('Not implemented');
+        // We've loaded data
+        if (this.bar.runs.length == 0) {
+            this.repaintEmpty('No runs loaded');
+            return;
+        }
+        this.bins = [];
+        // Check that bar contains connections (labels) of the form 'xxx-xxx'
+        const labelsIdx = getRoiRoiLabelsIdx(this.bar);
+        if (!labelsIdx && labelsIdx !== 0) {
+            this.repaintEmpty('No labels matching "xxx-xxx" in run 0');
+            return;
+        }
+        // Check that the 'xxx-xxx' labels match a loaded template
+        // 1: full match, +2: the 2 rois = 3
+        const meta = bar.meta.filter(m => bar.runs[0].Labels[labelsIdx][0].match(new RegExp(m.Template)).length == 3)[0];
+        if (!meta) {
+            this.repaintEmpty('No matching community metadata loaded');
+            return;
+        }
+        // Bin connections in range From - To (set via listener in analyze.js)
+        this.bins = new Array(meta.CommunityNames.length).fill(0);
+        for (let i=this.from; i<this.to; i++) {
+            this.bar.runs[0].Labels[labelsIdx][this.bar.composite[i][1]].split('-').forEach(roi => {
+                this.bins[meta.CommunityMap[parseInt(roi)]]++;
+            });
+        }
+        // Normalize expected to bins
+        const binA = sum(this.bins);
+        const expA = sum(meta.Expected);
+        this.exp = meta.Expected.map(n => n*binA/expA);
+        // Construct Vega spec
+        const style = getComputedStyle(this.div);
+        const values = this.bins.map((n, comm) => ({community: meta.CommunityNames[comm], 
+            number: n, expected: this.exp[comm], max: Math.max(n, this.exp[comm])}));
+        const spec = {
+            "$schema": "https://vega.github.io/schema/vega/v5.json",
+            "width": parseInt(style.width)-60,
+            "height": parseInt(style.height)-60,
+            "padding": 0,
+            "data": [
+            {
+                "name": "bins",
+                "values": values
+            }],
+            "signals": [
+            {
+                "name": "tooltip",
+                "value": {},
+                "on": [
+                    {"events": "rect:mouseover", "update": "datum"},
+                    {"events": "rect:mouseout", "update": "{}"},
+                ]
+            }],
+            "scales": [
+            {
+                "name": "xscale",
+                "type": "band",
+                "domain": {"data": "bins", "field": "community"},
+                "range": "width",
+                "padding": 0.1,
+                "round": true
+            },
+            {
+                "name": "yscale",
+                "domain": {"data": "bins", "field": "max"},
+                "nice": true,
+                "range": "height"
+            },
+            {
+                name: 'yscaleNumber',
+                domain: {data: 'bins', field: 'number'},
+                nice: true,
+                range: 'height'
+            },
+            {
+                name: 'yscaleExpected',
+                domain: {data: 'bins', field: 'expected'},
+                nice: true,
+                range: 'height'
+            }],
+            "axes": [
+            { "orient": "bottom", "scale": "xscale", "labels": false},
+            { "orient": "left", "scale": "yscale" }
+            ],
+            "marks": [ // rectangle for number
+            {
+                "type": "rect",
+                "from": {"data": "bins"},
+                "encode": {
+                    "enter": {
+                        "x": {"scale": "xscale", "field": "community"},
+                        "width": {"scale": "xscale", "band": 1},
+                        "y": {"scale": "yscale", "field": "number"},
+                        "y2": {"scale": "yscale", "value": 0}
+                    },
+                    "update": {
+                        "fill": {"value": "steelblue"}
+                    },
+                    /*"hover": {
+                        "fill": {"value": "red"}
+                    }*/
+                }
+            },
+            { // red line for expected
+                type: 'rect',
+                from: {data: 'bins'},
+                encode: {
+                    enter: {
+                        x: {scale: 'xscale', field: 'community'},
+                        width: {scale: 'xscale', band: 1},
+                        y: {scale: 'yscale', field: 'expected'},
+                        y2: {scale: 'yscale', field: 'expected', offset: -2},
+                        fill: {value: 'red'}
+                    }
+                }
+            },
+            { // Display short community name above max
+                "type": "text",
+                "from": {"data": "bins"},
+                "encode": {
+                    "enter": {
+                        "align": {"value": "left"},
+                        "baseline": {"value": "bottom"},
+                        "x": {"scale": "xscale", field: "community"},
+                        "y": {"scale": "yscale", field: 'max', "offset": -2},
+                        "text": {"data": "bins", "field": "community" },
+                        "fill": {"value": "#333"}
+                    },
+                }
+            }]
+        };
+        // Display in the div
+        this.render(spec);
     }
 }
 
-class BarGraph extends VegaBarAdapter {
+class MainGraph extends VegaDivAdapter {
+	constructor(div) {
+        super(div);
+        this.selected = [];
+    }
+
+    toggle(idx) {
+        idx = parseInt(idx);
+        const i = this.selected.indexOf(idx);
+        if (i != -1) {
+            this.selected.splice(i, 1);
+        } else {
+            this.selected.push(idx);
+        }
+    }
+}
+
+class BarGraph extends MainGraph {
 	constructor(div) {
         super(div);
 		this.runs = [];
@@ -304,7 +358,7 @@ class BarGraph extends VegaBarAdapter {
 		this.abs = true;
 		this.composite = null;
         this.labelsIdx = null;
-        this.selected = [];
+        this.meta = [];
 	}
 
     get dim() {
@@ -316,7 +370,7 @@ class BarGraph extends VegaBarAdapter {
 		this.composite = new Array(this.runs[0].Weights.length).fill(0);
 		this.runs.forEach(run => {
 			for (let i=0; i<this.composite.length; i++) {
-				this.composite[i] += run.Weights[i]/this.composite.length;
+				this.composite[i] += run.Weights[i]/this.runs.length;
 			}
 		});
 		if (this.abs) {
@@ -332,8 +386,8 @@ class BarGraph extends VegaBarAdapter {
 	}
 
 	repaint() {
-        // Can graph even before data finishes loading
-        if (!this.composite || !this.runs[0].Labels) {
+        // Can't graph before some data loads
+        if (!this.composite) {
             this.repaintEmpty('Data not loaded yet...');
             return;
         }
@@ -374,14 +428,6 @@ class BarGraph extends VegaBarAdapter {
                 "name": "weights",
                 "values": values
             }],
-            /*"signals": [
-            {
-                "name": "tooltip",
-                "value": {},
-                "on": [
-                    {"events": "rect:mousedown", "update": "datum"},
-                ]
-            }],*/
             "scales": [
             {
                 "name": "xscale",
@@ -432,11 +478,219 @@ class BarGraph extends VegaBarAdapter {
                     "enter": {
                         "align": {"value": "center"},
                         "baseline": {"value": "bottom"},
-                        "fill": {"value": "#333"}
-                    },
-                    "update": {
                         "x": {"scale": "xscale", field: "idx", offset: 12},
                         "y": {"scale": "yscale", field: 'alt-weight', "offset": {data: 'weights', field: 'offset'}},
+                        "text": {"data": "bins", "field": "label" },
+                        "fill": {"value": "#333"}
+                    },
+                }
+            }]
+        };
+        // Display in the div
+        this.render(spec);
+	}
+}
+
+class BoxPlot extends MainGraph {
+	constructor(div, bar) {
+        super(div);
+		this.bar = bar;
+	}
+
+	recalc() {
+        // Get stats
+		this.stats = new Array(this.bar.runs[0].Weights.length);
+		const m = this.bar.runs.length;
+		for (let i=0; i<this.stats.length; i++) {
+			const dist = this.bar.runs.map(run => run.Weights[i]);
+            //const mu = sum(dist)/dist.length;
+			dist.sort((a,b) => a-b);
+			// minimum, maximum, median, 1st quartile, 3rd quartile, index
+			this.stats[i] = {
+				min: dist[0], 
+				max: dist.at(-1),
+                //mu: mu,
+				median: (m%2 == 0) ? (dist[m/2]+dist[m/2-1])/2 : dist[Math.floor(m/2)], 
+				first: dist[Math.floor(m/4)],
+				third: dist[Math.floor(3*m/4)],
+                //std: (Math.sqrt(sum(dist.map(d => Math.pow(d,2))) - Math.pow(mu,2)))/(dist.length-1),
+                tenth: dist[Math.floor(m/10)],
+                ninetieth: dist[Math.floor(9*m/10)],
+                idx: i
+			};
+		}
+        // Sort by median
+		if (this.bar.sorted) {
+			this.stats.sort((a,b) => Math.abs(b.median)-Math.abs(a.median));
+		}
+    }
+
+    repaint() {
+        // Can graph even before data finishes loading
+        if (!this.stats) {
+            this.repaintEmpty('Data not loaded yet...');
+            return;
+        }
+        // Get data to be graphed
+        let domainMin = Infinity, domainMax = -Infinity;
+        const values = [];
+        for (let i=this.bar.from; i<this.bar.to; i++) {
+            const stats = {...this.stats[i]};
+            if ((i-this.from)%2 == 0) {
+                stats.offset = this.stats[i][0];
+            } else {
+                stats.offset = this.stats[i][1];
+            }
+            stats.link = `#rect-select-${stats.idx}`;
+            stats.selected = this.selected.includes(stats.idx);
+            // Min and max get crazy sometimes
+            // Replace with 10% and 90%
+            stats.min = stats.tenth
+            stats.max = stats.ninetieth
+            values.push(stats);
+            // Update domain
+            if (stats.min < domainMin) domainMin = stats.min;
+            if (stats.max > domainMax) domainMax = stats.max;
+            // Place labels
+            if (this.bar.labelsIdx || this.bar.labelsIdx === 0) {
+                stats.label = this.bar.runs[0].Labels[this.bar.labelsIdx][stats.idx];
+            } else {
+                stats.label = '';
+            }
+            if (i%2 == 0) {
+                // Above
+                stats.textPosValue = stats.max;
+                stats.offset = -2;
+            } else {
+                // Below
+                stats.textPosValue = stats.min;
+                stats.offset = 16;
+            }
+        }
+        const style = getComputedStyle(this.div);
+        // Adjust domains for text
+        const width = parseInt(style.width)-80;
+        const height = parseInt(style.height)-60;
+        const dd = domainMax-domainMin;
+        const hd = dd*40/height;
+        domainMax += hd/2;
+        domainMin -= hd/2;
+        const spec = {
+            "$schema": "https://vega.github.io/schema/vega/v5.json",
+            "width": width,
+            "height": height,
+            "padding": 0,
+            "data": [
+            {
+                "name": "weights",
+                "values": values,
+            }],
+            "scales": [
+            {
+                "name": "xscale",
+                "type": "band",
+                "domain": {"data": "weights", "field": "idx"},
+                "range": "width",
+                "padding": 0.1,
+                "round": true
+            },
+            {
+                "name": "yscale",
+                domain: {data: 'weights', field: 'median'},
+                domainMin: domainMin,
+                domainMax: domainMax,
+                "range": "height"
+            }],
+            "axes": [
+            { "orient": "bottom", "scale": "xscale", "labels": false},
+            { "orient": "left", "scale": "yscale" }
+            ],
+            "marks": [
+            { // Central line
+                type: 'rect',
+                from: {data: 'weights'},
+                encode: {
+                    enter: {
+                        xc: {scale: 'xscale', field: 'idx', offset: 5},
+                        width: {value: 1},
+                        y: {scale: 'yscale', field: 'min'},
+                        y2: {scale: 'yscale', field: 'max'},
+                        fill: {value: 'black'}
+                    }
+                }
+            },
+            {
+                "type": "rect",
+                "from": {"data": "weights"},
+                "encode": {
+                    "enter": {
+                        "xc": {"scale": "xscale", "field": "idx", offset: 5},
+                        "width": {"scale": "xscale", "band": 1},
+                        "y": {"scale": "yscale", "field": "first"},
+                        "y2": {"scale": "yscale", field: 'third'},
+                        href: {data: 'weight', field: 'link'}
+                    },
+                    "update": {
+                        fill: [
+                            {test: 'datum.selected', value: 'red'},
+                            {value: 'steelblue'}
+                        ],
+                    },
+                    "hover": {
+                        "fill": {"value": "red"},
+                        'cursor': {'value': 'pointer'},
+                    }
+                }
+            },
+            { // Minimum (10%)
+                type: 'rect',
+                from: {data: 'weights'},
+                encode: {
+                    enter: {
+                        xc: {scale: 'xscale', field: 'idx', offset: 5},
+                        width: {scale: 'xscale', band: 1},
+                        y: {scale: 'yscale', field: 'min'},
+                        y2: {scale: 'yscale', field: 'min', offset: -1},
+                        fill: {value: 'black'}
+                    }
+                }
+            },
+            { // Maximum (90%)
+                type: 'rect',
+                from: {data: 'weights'},
+                encode: {
+                    enter: {
+                        xc: {scale: 'xscale', field: 'idx', offset: 5},
+                        width: {scale: 'xscale', band: 1},
+                        y: {scale: 'yscale', field: 'max'},
+                        y2: {scale: 'yscale', field: 'max', offset: 1},
+                        fill: {value: 'black'}
+                    }
+                }
+            },
+            { // Median
+                type: 'rect',
+                from: {data: 'weights'},
+                encode: {
+                    enter: {
+                        xc: {scale: 'xscale', field: 'idx', offset: 5},
+                        width: {scale: 'xscale', band: 1},
+                        y: {scale: 'yscale', field: 'median'},
+                        y2: {scale: 'yscale', field: 'median', offset: 1},
+                        fill: {value: '#afa'}
+                    }
+                }
+            },
+            { // Alternate display text above and below bar
+                "type": "text",
+                "from": {"data": "weights"},
+                "encode": {
+                    "enter": {
+                        "align": {"value": "center"},
+                        "baseline": {"value": "bottom"},
+                        "fill": {"value": "#333"},
+                        xc: {"scale": "xscale", field: "idx", offset: 5},
+                        "y": {"scale": "yscale", field: 'textPosValue', "offset": {data: 'weights', field: 'offset'}},
                         "text": {"data": "bins", "field": "label" },
                     }
                 }
@@ -444,141 +698,5 @@ class BarGraph extends VegaBarAdapter {
         };
         // Display in the div
         this.render(spec);
-	}
-
-    toggle(idx) {
-        idx = parseInt(idx);
-        const i = this.selected.indexOf(idx);
-        if (i != -1) {
-            this.selected.splice(i, 1);
-        } else {
-            this.selected.push(idx);
-        }
-    }
-}
-
-class BoxPlot {
-	constructor(barGraph) {
-		this.barGraph = barGraph;
-		this.boxes = [];
-	}
-	
-	click(p) {
-		this.boxes.forEach(box => {
-			if (box.contains(p)) box.selected = !box.selected;
-		});
-	}
-
-	get dim() {
-		return this.barGraph.dim;
-	}
-
-	set dim(dim) {
-		this.barGraph.dim = dim;
-	}
-
-	/*set displayLabels(display) {
-		this.display = display;
-		this.boxes.forEach(box => box.display = display);
-	}*/
-	
-	mousemove(p) {
-		this.mouseout();
-		this.boxes.forEach(bar => {
-			if (bar.contains(p)) bar.hovering = true;	
-		});
-	}
-
-	mouseout() {
-		this.boxes.forEach(bar => bar.hovering = false);
-	}
-
-	recalc() {
-		this.stats = new Array(this.runs[0].Weights.length);
-		const m = this.runs.length;
-		for (let i=0; i<this.stats.length; i++) {
-			const dist = this.runs.map(run => run.Weights[i]);
-			dist.sort((a,b) => a-b);
-			// minimum, maximum, median, 1st quartile, 3rd quartile, outliers
-			const stats = [
-				dist[0], 
-				dist.at(-1), 
-				(m%2 == 0) ? (dist[m/2]+dist[m/2-1])/2 : dist[Math.floor(m/2)], 
-				dist[Math.floor(m/4)],
-				dist[Math.floor(3*m/4)]
-			];
-			stats.push(dist.filter(val => (val-stats[2])>1.5*(val-stats[3]) || (val-stats[2])>1.5*(val-stats[4])));
-			this.stats[i] = stats;
-		}
-		this.stats = zip(this.stats, this.runs[0].Labels[this.barGraph.labelsIdx]);
-		if (this.barGraph.sorted) {
-			this.stats.sort((a,b) => Math.abs(b[0][2])-Math.abs(a[0][2]));
-		}
-		this.min = Math.min(...this.stats.filter(dist => dist[0][0]).map(a => a[0][0]));
-		this.max = Math.max(...this.stats.filter(dist => dist[0][1]).map(a => a[0][1]));
-		this.boxes = [];
-		this.dim = this.barGraph.dim;
-		// Make boxes
-		const n = this.view[1]-this.view[0];
-		console.assert(n > 0 && n < 1e5);
-		const dx = (this.dim.w-50)/n
-		const bx = 0.6*dx;
-		const uh = this.dim.h-50;
-		const zy = this.max/(this.max+Math.abs(this.min))*uh+25;
-		const dy = uh/(this.max-this.min);
-		for (let i=0, j=this.view[0], x=0; i<n; i++, j++, x+=dx) {
-			const y0 = zy-dy*this.stats[j][0][0]; // min
-			const y1 = zy-dy*this.stats[j][0][1]; // max
-			const y2 = zy-dy*this.stats[j][0][2]; // median
-			const y3 = zy-dy*this.stats[j][0][3]; // 1st quart
-			const y4 = zy-dy*this.stats[j][0][4]; // 3rd quart
-			const x = i*dx+25;
-			this.boxes.push(new Box({
-				label: this.stats[j][1],
-				graph: this,
-				outerPos: {x: x+0.25*bx, y: y1},
-				innerPos: {x: x, y: y4},
-				outerDim: {w: 0.5*bx, h: y0-y1},
-				innerDim: {w: bx, h: y3-y4},
-				median: {x: x, y: y2},
-				outliers: this.stats[j][0][5].map(val => ({x: x+0.5*bx, y: zy-dy*val})),
-				display: this.display
-			}));
-		}
-		this.zy = zy;
-	}
-
-	get runs() {
-		return this.barGraph.runs;
-	}
-
-	set runs(runs) {
-		this.barGraph.runs = runs;
-	}
-
-	repaint(ctx) {
-		ctx.fillStyle = '#fff';
-		ctx.fillRect(0, 0, this.dim.w, this.dim.h);
-		strokeLine(ctx, {x: 20, y: this.zy}, {x: this.dim.w-20, y: this.zy});
-		let count = 0;
-		this.boxes.forEach(box => box.draw(ctx, count++));
-		const ny = 6;
-		const dy = (this.dim.h-50)/ny;
-		const dyy = (this.max-this.min)/ny;
-		for (let i=0; i<=ny+.1; i++) {
-			const x = 2;
-			const y = 25+i*dy;
-			ctx.fillStyle = '#000';
-			ctx.font = '8px Sans-serif';
-			ctx.fillText((this.max-i*dyy).toFixed(3), x, y);
-		}
-	}
-
-	get view() {
-		return this.barGraph.view;
-	}
-
-	set view(view) {
-		this.barGraph.view = view;
 	}
 }
