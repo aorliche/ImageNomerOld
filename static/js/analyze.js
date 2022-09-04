@@ -9,6 +9,8 @@ var bar = null;
 var box = null;
 var sideCommunities = null;
 var sideConnections = null;
+var sideSimilarityMatrix = null;
+var sideSimilarityLine = null;
 
 var $ = q => document.querySelector(q);
 var $$ = q => [...document.querySelectorAll(q)];
@@ -72,6 +74,8 @@ window.addEventListener('load', e => {
     // Old behavior was to keep trying every 5 seconds
     // Replace matching templates
 	function metadataLoadCb(meta) {
+        // meta can be null
+        if (meta == null) return;
         let found = false;
         for (let i=0; i<bar.meta.length; i++) {
             if (bar.meta[i].Template == meta.Template) {
@@ -82,10 +86,39 @@ window.addEventListener('load', e => {
         if (!found) bar.meta.push(meta);
         if (getActiveSideGraph() == sideCommunities)
             sideCommunities.repaint();
+        // Create label based on ROI Community metadata if we get it
+        // We must also have an ROIs label
+        if (meta.Template == '(\\d+)-(\\d+)' && bar.runs.length > 0) {
+            // Find ROIs label (in case it is named differently)
+            // 1: full match, +2: the 2 rois = 3
+            const re = new RegExp(meta.Template);
+            let labelsIdx = null;
+            bar.runs[0].Labels.forEach((lab,i) => {
+                // Labels can be int or result can be null
+                try {
+                    if (lab[0].match(re).length == 3) {
+                        labelsIdx = i;
+                    }
+                } catch (e) {}
+            });
+            if (labelsIdx || labelsIdx === 0) {
+                bar.runs[0].Labels.push(bar.runs[0].Labels[labelsIdx].map(lab => 
+                    lab.split('-').map(part => meta.CommunityNames[meta.CommunityMap[parseInt(part)]]).join('-')));
+                bar.runs[0].LabelNames.push('Communities');
+                const opt = document.createElement('option');
+                opt.innerText = 'Communities';
+                $('#label-select').appendChild(opt);
+            }
+        }
 	}
 
     // We filter old metadata by template
+    // Wait on metadata until we have runs[0] and runs[0].Labels
     function loadMetadata() {
+        if (bar.runs.length == 0 || !bar.runs[0].Labels) {
+            setTimeout(loadMetadata, 1000);
+            return;
+        }
         const aid = $('#description').dataset.id;
         fetch(`/data?id=${aid}&metadata`)
         .then(resp => resp.json())
@@ -93,7 +126,14 @@ window.addEventListener('load', e => {
         .catch(err => console.log(err));
     }
 
+    // Load metadata on initial load - will keep trying until run[0].Labels appears
     loadMetadata();
+
+    // User can also click a link to load metadata
+    $('#load-metadata').addEventListener('click', e => {
+        e.preventDefault();
+        loadMetadata();
+    });
 
     // Placeholder div and nilearn-plot-div get a repaint method
     $('#placeholder-div').repaint = () => null;
@@ -186,7 +226,7 @@ window.addEventListener('load', e => {
                 side.style.display = 'none';
             });
             $('#similarity-run-div').style.display = 'block';
-            $('#subject-similarity-menu-div').style.display = 'block';
+            $('#subject-similarity-menu-div').style.display = 'inline-block';
             // Parse args
             const runidx = parseInt(parts[5]);
             const from = parseInt(parts[6]);
@@ -220,12 +260,19 @@ window.addEventListener('load', e => {
             active.div.style.display = 'block';
             $('#from-to-div').style.display = 'inline-block';
         } else {
+            // Check that we have an 'xxx-xxx' label
             active.style.display = 'block';
-            // Plot image
-            if (e.target.selectedIndex == 3) {
-                consOrRegsRequest('regions');
-            } else if (e.target.selectedIndex == 4) {
-                consOrRegsRequest('connections');
+            if (getRoiRoiLabelsIdx(bar) !== null) {
+                // Plot image
+                if (e.target.selectedIndex == 3) {
+                    consOrRegsRequest('regions');
+                } else if (e.target.selectedIndex == 4) {
+                    consOrRegsRequest('connections');
+                }
+            } else if (active == $('#placeholder-div')) {
+                // Do nothing (keep placeholder text)
+            } else {
+                active.innerText = 'No labels matching "xxx-xxx" in run 0';
             }
         }
         active.repaint();
@@ -301,6 +348,7 @@ window.addEventListener('load', e => {
             $('#nilearn-plot-div').innerText = 'No connections selected';
             return;
         }
+        $('#nilearn-plot-div').innerText = 'Plotting...';
         e.preventDefault();
         fetch(`/data?id=${aid}&image=${consOrRegs}`, {
             method: 'POST', 
@@ -312,27 +360,19 @@ window.addEventListener('load', e => {
 		.catch(err => console.log(err));
     }
 
-   /* 
-	plotRegionsButton.addEventListener('click', e => consOrRegsRequest('regions'));
-	plotConnectionsButton.addEventListener('click', e => consOrRegsRequest('connections'));*/
-
     // Export labels from the main graph
     function exportLabels() {
-        const text = [];
-        /*if (barBoxButton.innerText == 'Box Plot') {
-            barGraph.bars.forEach(bar => {
-                text.push(bar.label);
-            });
+        if (!bar.labelsIdx && bar.labelsIdx !== 0) {
+            alert('No labels selected');
+            return;
+        }
+        let labels;
+        if (getActiveMainGraph() == bar) {
+            labels = bar.composite.slice(bar.from,bar.to-bar.from).map(wi => bar.runs[0].Labels[bar.labelsIdx][wi[1]]);
         } else {
-            boxPlot.boxes.forEach(box => {
-                text.push(box.label);
-            });
-        }*/
-        const items = getActiveMainGraph() == bar ? bar.bars : box.boxes;
-        items.forEach(item => {
-            text.push(item.label);
-        });
-        const file = new Blob([text.join('\n')], {type: "application/octet-stream"});
+            labels = box.stats.slice(bar.from,bar.to-bar.from).map(stats => bar.runs[0].Labels[bar.labelsIdx][stats.idx]);
+        }
+        const file = new Blob([labels.join('\n')], {type: "application/octet-stream"});
         const a = document.createElement("a");
         const url = URL.createObjectURL(file);
         a.href = url;
@@ -349,14 +389,4 @@ window.addEventListener('load', e => {
         e.preventDefault();
         exportLabels();
     });
-    
-    /*exportLabelsA.addEventListener('click', e => {
-        e.preventDefault();
-        exportLabels();
-    });
-
-    loadMetadataA.addEventListener('click', e => {
-        e.preventDefault();
-        loadMetadata();
-    });*/
 });

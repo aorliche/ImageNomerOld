@@ -17,7 +17,7 @@ function sum(arr) {
 function getRoiRoiLabelsIdx(graph) {
     let labelsIdx = null;
     graph.runs[0].Labels.forEach((labels, i) => {
-        if (labels[0].toString().search(/\d+-\d+/) != -1) {
+        if (labels[0].toString().search(/^\d+-\d+$/) != -1) {
             labelsIdx = i;
         }
     });

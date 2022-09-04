@@ -2,6 +2,7 @@
 <html>
 <head>
 	<title>ImageNomeR | Analyze {{ id }} </title>
+    <link rel="icon" type="image/png" href="/images/brain.png">
 	<link rel='stylesheet' href='/css/analyze.css'>
     <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
 	<script src='/js/bar.js'></script>
@@ -32,7 +33,6 @@
                 <option id='label-select-{{ label }}'>{{ labelName }}</option>
                 {% endfor %}
             </select>
-            <br>
             <a href='#' id='export-labels-a'>Export Labels</a>
         </div>
         <div id='main' class='empty'>Loading...</div>
@@ -47,7 +47,6 @@
                 <option>Nilearn ROIs Plot</option>
                 <option>Nilearn Connections Plot</option>
             </select>
-            <br>
             <!-- Connections and Communities top features range -->
             <div id='from-to-div' style='display: none;' class='side-opt'>
                 <label for='from-range'>Feat From</label> 
