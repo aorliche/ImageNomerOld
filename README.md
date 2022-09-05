@@ -1,7 +1,7 @@
 # ImageNomeR
 Image/Genome/Transcriptome Explorer
 
-The purpose of ImageNomeR is to facilitate efficient exploration of fMRI/omics data.
+The purpose of ImageNomeR is to explore and identify important features and inter-subject relationships in regression and classification models.
 
 ## Table of Contents
 
@@ -49,13 +49,16 @@ Currently the only way to install is via git. Run this command:
 git clone https://github.com/u-brite/ImageNomeR.git
 ```
 
-We are working on a distributable pip package. You can run 
+Then run 
 
 ```
-pip install -e .
+git submodule init
+git submodule update
 ```
 
-in the ImageNomeR directory to install the library component, but this will not install the server or web interface.
+to get access to the <a href='https://github.com/aorliche/LatentSimilarity'>LatSim</a> model used in some notebooks.
+
+We are working on a distributable pip package.
 
 ## Data
 
@@ -78,19 +81,20 @@ You can see an example of the Power regions of interest (ROIs) being used to ext
 
 ### Loading Data
 
-To load the data needed to run experiments, you must run the _getdata.py_ script located in the data/ directory.
+To load the data needed to run experiments, you must run the _getdata.py_ script.
 
 ```
-cd data
 python getdata.py
 ```
+
+The data will be located in the (newly created) data directory.
 
 ## Usage
 
 Once you have loaded the data, navigate back to the top ImageNomeR directory, and start the server:
 
 ```
-ython src/flask_backend/flask_backend.py 8000
+python imagenomer/flask_backend/flask_backend.py 8000
 ```
 
 Navigate to http://localhost:8000/ (note, no "s"). If the server is running but there are no analyses, you will see a screen like the following:
@@ -117,7 +121,7 @@ If the server is running, and you executed one or more experiments successfully,
 The library formats user data into JSON and sends it to the server. The following line imports components from the ImageNomeR library:
 
 ```
-from imagenomer import Analysis, JsonData, JsonSubjects, JsonFCMetadata
+from imagenomer import Analysis
 ```
 
 Please take a look at the code for details on how to generate acceptable JSON.
@@ -185,5 +189,3 @@ Two of these are muscle proteins, and a third is heavily involved in metabolism 
 Anton Orlichenko | aorlichenko@tulane.edu | Team Leader<br/>
 Jack Freeman | jackwfreeman@yahoo.com | Team Co-leader<br/>
 Grant Daly | daly@southalabama.edu <br/>
-Justin Li<br/>
-Jie Yuan
