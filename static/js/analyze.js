@@ -326,10 +326,6 @@ window.addEventListener('load', e => {
 	}
 
 	function displayImage(json) {
-        if (json.error) {
-            console.log(json.error);
-            return;
-        }
         const img = new Image();
         img.src = 'data:image/png;base64,' + json.b64;
         img.alt = 'nilearn plot';
@@ -356,7 +352,13 @@ window.addEventListener('load', e => {
 			body: JSON.stringify(res)
         })
 		.then(resp => resp.json())
-		.then(json => displayImage(json))
+		.then(json => {
+            if (json.err) {
+                console.log(json);
+                return;
+            }
+            displayImage(json);
+        })
 		.catch(err => console.log(err));
     }
 

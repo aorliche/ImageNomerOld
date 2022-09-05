@@ -124,7 +124,7 @@ class ConnectionsBarGraph extends VegaDivAdapter {
             }],
             "axes": [
             { "orient": "bottom", "scale": "xscale", "labels": false},
-            { "orient": "left", "scale": "yscale" }
+            { "orient": "left", "scale": "yscale", grid: true }
             ],
             "marks": [
             {
@@ -277,7 +277,7 @@ class CommunitiesBarGraph extends VegaDivAdapter {
             }],
             "axes": [
             { "orient": "bottom", "scale": "xscale", "labels": false},
-            { "orient": "left", "scale": "yscale" }
+            { "orient": "left", "scale": "yscale", grid: true }
             ],
             "marks": [ // rectangle for number
             {
@@ -445,7 +445,7 @@ class BarGraph extends MainGraph {
             }],
             "axes": [
             { "orient": "bottom", "scale": "xscale", "labels": false},
-            { "orient": "left", "scale": "yscale" }
+            { "orient": "left", "scale": "yscale", grid: true }
             ],
             "marks": [
             {
@@ -516,7 +516,8 @@ class BoxPlot extends MainGraph {
                 //std: (Math.sqrt(sum(dist.map(d => Math.pow(d,2))) - Math.pow(mu,2)))/(dist.length-1),
                 tenth: dist[Math.floor(m/10)],
                 ninetieth: dist[Math.floor(9*m/10)],
-                idx: i
+                idx: i,
+                idxP1: i+1 // for makeshift zero line plotting
 			};
 		}
         // Sort by median
@@ -603,7 +604,7 @@ class BoxPlot extends MainGraph {
             }],
             "axes": [
             { "orient": "bottom", "scale": "xscale", "labels": false},
-            { "orient": "left", "scale": "yscale" }
+            { "orient": "left", "scale": "yscale", grid: true }
             ],
             "marks": [
             { // Central line
